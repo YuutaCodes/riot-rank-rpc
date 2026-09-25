@@ -1,0 +1,22 @@
+# Build output
+/riotrpc
+/riotrpc.exe
+*.exe
+*.test
+
+# Go tooling
+*.out
+
+# Local secrets/config — Riot lockfile tokens, Discord app config, etc.
+.env
+*.local.json
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# Claude Code project config/docs — local only, not for the public repo
+.claude/
+CLAUDE.md
