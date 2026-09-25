@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"fmt"
@@ -32,7 +32,18 @@ func main() {
 		return
 	}
 
+	// KNOWN ISSUE: regionLocale.Region comes back as a League-style code (e.g. "EUW"),
+	// not a real Valorant shard ("eu", "na", "ap", "kr"), so this currently fails with
+	// "no such host" on a machine that only has League installed. Needs testing/fixing
+	// on a machine with Valorant installed to find the real Valorant region-locale shape.
+	mmr, err := fetchMMR(shardFromRegion(regionLocale.Region), entitlements.Subject, entitlements.AccessToken, entitlements.Token)
+	if err != nil {
+		fmt.Println("failed to fetch MMR:", err)
+		return
+	}
+
 	fmt.Printf("%+v\n", lf)
 	fmt.Printf("%+v\n", entitlements)
 	fmt.Printf("%+v\n", regionLocale)
+	fmt.Printf("%+v\n", mmr)
 }
