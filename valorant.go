@@ -47,4 +47,33 @@ func fetchEntitlements(lf Lockfile) (EntitlementsToken, error) {
 }
 
 type RegionLocale struct {
+	Region      string
+	Locale      string
+	WebLanguage string
+}
+
+func fetchRegionLocale(lf Lockfile) (RegionLocale, error) {
+	url := fmt.Sprintf("https://127.0.0.1:%d/riotclient/region-locale", lf.Port)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return RegionLocale{}, err
+	}
+
+	req.SetBasicAuth("riot", lf.Password)
+
+	resp, err := localClient.Do(req)
+	if err != nil {
+		return RegionLocale{}, err
+	}
+
+	defer resp.Body.Close()
+
+	var result RegionLocale
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return RegionLocale{}, err
+	}
+
+	return result, nil
 }

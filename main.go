@@ -26,6 +26,13 @@ func main() {
 		return
 	}
 
+	regionLocale, err := fetchRegionLocale(lf)
+	if err != nil {
+		fmt.Println("failed to fetch region locale:", err)
+		return
+	}
+
 	fmt.Printf("%+v\n", lf)
 	fmt.Printf("%+v\n", entitlements)
+	fmt.Printf("%+v\n", regionLocale)
 }
