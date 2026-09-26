@@ -108,5 +108,5 @@ func main() {
 	fmt.Println("total skins:", len(skinData))
 	fmt.Printf("%+v\n", skinData[0])
 	fmt.Println()
-	fmt.Println(skinIndex["1baa85b4-4c70-1284-64bb-6481dfc3bb4e"])
+	fmt.Println(skinIndex["f20bdd80-4cbf-67a8-106e-72bbf94336aa"])
 }

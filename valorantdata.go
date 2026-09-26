@@ -28,7 +28,7 @@ func fetchClientVersion() (string, error) {
 	return result.Data.RiotClientVersion, nil
 }
 
-func fetchWeaponSkins() (map[string]interface{}, error) {
+func fetchWeaponSkins() (map[string]any, error) {
 	resp, err := http.DefaultClient.Get("https://valorant-api.com/v1/weapons/skins")
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func fetchWeaponSkins() (map[string]interface{}, error) {
 
 	defer resp.Body.Close()
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, err
@@ -45,15 +45,19 @@ func fetchWeaponSkins() (map[string]interface{}, error) {
 	return result, nil
 }
 
-func buildSkinNameIndex(skins []interface{}) map[string]string {
+func buildSkinNameIndex(skins []any) map[string]string {
 	index := map[string]string{}
 
 	for _, s := range skins {
-		skin := s.(map[string]interface{})
+		skin := s.(map[string]any)
 		displayName := skin["displayName"].(string)
-		levels := skin["levels"].([]interface{})
+
+		baseUUID := skin["uuid"].(string)
+		index[baseUUID] = displayName
+
+		levels := skin["levels"].([]any)
 		for _, l := range levels {
-			level := l.(map[string]interface{})
+			level := l.(map[string]any)
 			uuid := level["uuid"].(string)
 			index[uuid] = displayName
 		}

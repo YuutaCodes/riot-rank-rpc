@@ -86,7 +86,7 @@ func fetchRegionLocale(lf Lockfile) (RegionLocale, error) {
 // changes every game patch and has to be fetched live.
 const clientPlatform = "ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9"
 
-func fetchMMR(shard string, puuid string, accessToken string, entitlementToken string) (map[string]interface{}, error) {
+func fetchMMR(shard string, puuid string, accessToken string, entitlementToken string) (map[string]any, error) {
 	clientVersion, err := fetchClientVersion()
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func fetchMMR(shard string, puuid string, accessToken string, entitlementToken s
 
 	defer resp.Body.Close()
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func readClientVersionFromLog() (string, error) {
 	return "", errors.New("version line not found in log")
 }
 
-func fetchParty(shard string, partyID string, accessToken string, entitlementToken string) (map[string]interface{}, error) {
+func fetchParty(shard string, partyID string, accessToken string, entitlementToken string) (map[string]any, error) {
 	clientVersion, err := fetchClientVersion()
 	if err != nil {
 		return nil, err
@@ -225,7 +225,7 @@ func fetchParty(shard string, partyID string, accessToken string, entitlementTok
 
 	defer resp.Body.Close()
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, err
@@ -271,7 +271,7 @@ func fetchPregameMatchID(shard string, puuid string, accessToken string, entitle
 	return result, nil
 }
 
-func fetchPregameMatch(shard string, matchID string, accessToken string, entitlementToken string) (map[string]interface{}, error) {
+func fetchPregameMatch(shard string, matchID string, accessToken string, entitlementToken string) (map[string]any, error) {
 	clientVersion, err := readClientVersionFromLog()
 	if err != nil {
 		return nil, err
@@ -295,7 +295,7 @@ func fetchPregameMatch(shard string, matchID string, accessToken string, entitle
 
 	defer resp.Body.Close()
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, err
@@ -337,7 +337,7 @@ func fetchCoreGameMatchID(shard string, puuid string, accessToken string, entitl
 	return result, nil
 }
 
-func fetchLoadouts(shard string, matchID string, accessToken string, entitlementToken string) (map[string]interface{}, error) {
+func fetchLoadouts(shard string, matchID string, accessToken string, entitlementToken string) (map[string]any, error) {
 	clientVersion, err := readClientVersionFromLog()
 	if err != nil {
 		return nil, err
@@ -361,7 +361,7 @@ func fetchLoadouts(shard string, matchID string, accessToken string, entitlement
 
 	defer resp.Body.Close()
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return nil, err
