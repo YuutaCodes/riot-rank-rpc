@@ -260,7 +260,6 @@ func fetchPregameMatchID(shard string, puuid string, accessToken string, entitle
 		return MatchIDResponse{}, err
 	}
 
-	fmt.Println("Statuscode: ", resp.StatusCode)
 	defer resp.Body.Close()
 
 	var result MatchIDResponse
@@ -370,4 +369,3 @@ func fetchLoadouts(shard string, matchID string, accessToken string, entitlement
 
 	return result, nil
 }
-
