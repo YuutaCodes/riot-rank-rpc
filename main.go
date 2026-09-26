@@ -85,10 +85,16 @@ func main() {
 	}
 	skinData := skins["data"].([]interface{})
 
+	skinIndex := buildSkinNameIndex(skinData)
+
 	fmt.Printf("%+v\n", lf)
+	fmt.Println()
 	fmt.Printf("%+v\n", entitlements)
+	fmt.Println()
 	fmt.Printf("%+v\n", regionLocale)
+	fmt.Println()
 	fmt.Printf("%+v\n", mmr)
+	fmt.Println()
 	fmt.Printf("%+v\n", partyID)
 	fmt.Printf("%+v\n", party)
 	fmt.Println()
@@ -101,4 +107,6 @@ func main() {
 	fmt.Printf("%+v\n", loadouts)
 	fmt.Println("total skins:", len(skinData))
 	fmt.Printf("%+v\n", skinData[0])
+	fmt.Println()
+	fmt.Println(skinIndex["1baa85b4-4c70-1284-64bb-6481dfc3bb4e"])
 }

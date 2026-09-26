@@ -44,3 +44,20 @@ func fetchWeaponSkins() (map[string]interface{}, error) {
 
 	return result, nil
 }
+
+func buildSkinNameIndex(skins []interface{}) map[string]string {
+	index := map[string]string{}
+
+	for _, s := range skins {
+		skin := s.(map[string]interface{})
+		displayName := skin["displayName"].(string)
+		levels := skin["levels"].([]interface{})
+		for _, l := range levels {
+			level := l.(map[string]interface{})
+			uuid := level["uuid"].(string)
+			index[uuid] = displayName
+		}
+	}
+
+	return index
+}
