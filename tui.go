@@ -8,10 +8,11 @@ import (
 )
 
 type model struct {
-	cursor int
-	mmr    map[string]any
-	err    error
-	party  map[string]any
+	cursor   int
+	mmr      map[string]any
+	err      error
+	party    map[string]any
+	loadouts []PlayerLoadout
 }
 
 type mmrMsg struct {
@@ -24,8 +25,13 @@ type partyMsg struct {
 	Err  error
 }
 
+type loadoutsMsg struct {
+	Data []PlayerLoadout
+	Err  error
+}
+
 func (m model) Init() tea.Cmd {
-	return tea.Batch(fetchMMRCmd, fetchPartyCmd)
+	return tea.Batch(fetchMMRCmd, fetchPartyCmd, fetchLoadoutsCmd)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -50,6 +56,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case partyMsg:
 		m.party = msg.Data
 		m.err = msg.Err
+	case loadoutsMsg:
+		m.loadouts = msg.Data
+		m.err = msg.Err
 	}
 	return m, nil
 }
@@ -65,13 +74,22 @@ func (m model) View() string {
 	}
 	partyLine := ""
 	if m.party != nil {
-		partyLine = fmt.Sprintf("Party: %v\n", m.party)
+		members := m.party["Members"].([]any)
+		partyLine = fmt.Sprintf("Party size: %d\n", len(members))
+		for _, mem := range members {
+			member := mem.(map[string]any)
+			partyLine += fmt.Sprintf("  %s\n", member["Subject"].(string))
+		}
+	}
+	loadoutsLines := ""
+	for _, l := range m.loadouts {
+		loadoutsLines += fmt.Sprintf("%s playing %s, skins: %v\n", l.Subject, l.AgentName, l.Skins)
 	}
 	errLine := ""
 	if m.err != nil {
 		errLine = fmt.Sprintf("Error: %v\n", m.err)
 	}
-	return cursorLine + mmrLine + partyLine + errLine
+	return cursorLine + mmrLine + partyLine + loadoutsLines + errLine
 }
 
 func runTUI() {
@@ -138,4 +156,37 @@ func fetchPartyCmd() tea.Msg {
 	}
 
 	return partyMsg{Data: party}
+}
+
+func fetchLoadoutsCmd() tea.Msg {
+	entitlements, shard, err := authenticate()
+	if err != nil {
+		return loadoutsMsg{Err: err}
+	}
+
+	matchID, err := fetchCoreGameMatchID(shard, entitlements.Subject, entitlements.AccessToken, entitlements.Token)
+	if err != nil {
+		return loadoutsMsg{Err: err}
+	}
+
+	loadouts, err := fetchLoadouts(shard, matchID.MatchID, entitlements.AccessToken, entitlements.Token)
+	if err != nil {
+		return loadoutsMsg{Err: err}
+	}
+
+	skins, err := fetchWeaponSkins()
+	if err != nil {
+		return loadoutsMsg{Err: err}
+	}
+	skinIndex := buildSkinNameIndex(skins["data"].([]any))
+
+	agents, err := fetchAgents()
+	if err != nil {
+		return loadoutsMsg{Err: err}
+	}
+	agentIndex := buildAgentNameIndex(agents["data"].([]any))
+
+	summaries := summarizeLoadouts(loadouts, skinIndex, agentIndex)
+
+	return loadoutsMsg{Data: summaries}
 }
