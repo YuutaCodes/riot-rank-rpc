@@ -3,8 +3,10 @@
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -117,31 +119,6 @@ func fetchMMR(shard string, puuid string, accessToken string, entitlementToken s
 	return result, nil
 }
 
-// fetchClientVersion returns the current Valorant client version string (e.g.
-// "release-13.06-shipping-13-5435758") in the exact format PD/GLZ expect for the
-// X-Riot-ClientVersion header. This changes with every game patch, so it can't be hardcoded
-// like clientPlatform above, it has to be fetched live from a public, unauthenticated mirror.
-func fetchClientVersion() (string, error) {
-	resp, err := http.DefaultClient.Get("https://valorant-api.com/v1/version")
-	if err != nil {
-		return "", err
-	}
-
-	defer resp.Body.Close()
-
-	var result struct {
-		Data struct {
-			RiotClientVersion string `json:"riotClientVersion"`
-		} `json:"data"`
-	}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
-		return "", err
-	}
-
-	return result.Data.RiotClientVersion, nil
-}
-
 // regionToShard maps Riot's account-region codes (as returned by the local
 // region-locale endpoint, e.g. "EUW") to Valorant's actual shard codes used
 // in PD/GLZ server URLs ("eu", "na", "ap", "kr"). This is a best-guess table
@@ -165,3 +142,232 @@ func shardFromRegion(region string) string {
 	}
 	return strings.ToLower(region)
 }
+
+type CurrentPartyIDResponse struct {
+	CurrentPartyID string `json:"CurrentPartyId"`
+}
+
+func fetchPartyID(shard string, puuid string, accessToken string, EntitlementToken string) (string, error) {
+	url := fmt.Sprintf("https://glz-%s-1.%s.a.pvp.net/parties/v1/players/%s", shard, shard, puuid)
+
+	clientVersion, err := readClientVersionFromLog()
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-Riot-Entitlements-JWT", EntitlementToken)
+	req.Header.Set("X-Riot-ClientPlatform", clientPlatform)
+	req.Header.Set("X-Riot-ClientVersion", clientVersion)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	var result CurrentPartyIDResponse
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return "", err
+	}
+
+	return result.CurrentPartyID, nil
+}
+
+func readClientVersionFromLog() (string, error) {
+	path := os.Getenv("LOCALAPPDATA") + `\VALORANT\Saved\Logs\ShooterGame.log`
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "CI server version:") {
+			parts := strings.Split(line, "CI server version:")
+			if len(parts) > 1 {
+				return strings.TrimSpace(parts[1]), nil
+			}
+		}
+	}
+
+	return "", errors.New("version line not found in log")
+}
+
+func fetchParty(shard string, partyID string, accessToken string, entitlementToken string) (map[string]interface{}, error) {
+	clientVersion, err := fetchClientVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://glz-%s-1.%s.a.pvp.net/parties/v1/parties/%s", shard, shard, partyID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-Riot-Entitlements-JWT", entitlementToken)
+	req.Header.Set("X-Riot-ClientPlatform", clientPlatform)
+	req.Header.Set("X-Riot-ClientVersion", clientVersion)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+type MatchIDResponse struct {
+	MatchID string `json:"MatchID"`
+}
+
+func fetchPregameMatchID(shard string, puuid string, accessToken string, entitlementToken string) (MatchIDResponse, error) {
+	clientVersion, err := readClientVersionFromLog()
+	if err != nil {
+		return MatchIDResponse{}, err
+	}
+
+	url := fmt.Sprintf("https://glz-%s-1.%s.a.pvp.net/pregame/v1/players/%s", shard, shard, puuid)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return MatchIDResponse{}, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-Riot-Entitlements-JWT", entitlementToken)
+	req.Header.Set("X-Riot-ClientPlatform", clientPlatform)
+	req.Header.Set("X-Riot-ClientVersion", clientVersion)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return MatchIDResponse{}, err
+	}
+
+	fmt.Println("Statuscode: ", resp.StatusCode)
+	defer resp.Body.Close()
+
+	var result MatchIDResponse
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return MatchIDResponse{}, err
+	}
+
+	return result, nil
+}
+
+func fetchPregameMatch(shard string, matchID string, accessToken string, entitlementToken string) (map[string]interface{}, error) {
+	clientVersion, err := readClientVersionFromLog()
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://glz-%s-1.%s.a.pvp.net/pregame/v1/matches/%s", shard, shard, matchID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-Riot-Entitlements-JWT", entitlementToken)
+	req.Header.Set("X-Riot-ClientPlatform", clientPlatform)
+	req.Header.Set("X-Riot-ClientVersion", clientVersion)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func fetchCoreGameMatchID(shard string, puuid string, accessToken string, entitlementToken string) (MatchIDResponse, error) {
+	clientVersion, err := readClientVersionFromLog()
+	if err != nil {
+		return MatchIDResponse{}, err
+	}
+
+	url := fmt.Sprintf("https://glz-%s-1.%s.a.pvp.net/core-game/v1/players/%s", shard, shard, puuid)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return MatchIDResponse{}, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-Riot-Entitlements-JWT", entitlementToken)
+	req.Header.Set("X-Riot-ClientPlatform", clientPlatform)
+	req.Header.Set("X-Riot-ClientVersion", clientVersion)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return MatchIDResponse{}, err
+	}
+
+	defer resp.Body.Close()
+
+	var result MatchIDResponse
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return MatchIDResponse{}, err
+	}
+
+	return result, nil
+}
+
+func fetchLoadouts(shard string, matchID string, accessToken string, entitlementToken string) (map[string]interface{}, error) {
+	clientVersion, err := readClientVersionFromLog()
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://glz-%s-1.%s.a.pvp.net/core-game/v1/matches/%s/loadouts", shard, shard, matchID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-Riot-Entitlements-JWT", entitlementToken)
+	req.Header.Set("X-Riot-ClientPlatform", clientPlatform)
+	req.Header.Set("X-Riot-ClientVersion", clientVersion)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+

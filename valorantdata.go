@@ -27,5 +27,3 @@ func fetchClientVersion() (string, error) {
 
 	return result.Data.RiotClientVersion, nil
 }
-
-// TODO(human): implement fetchWeaponSkins to explore the shape.
