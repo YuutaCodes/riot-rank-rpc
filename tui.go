@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -65,14 +66,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	cursorLine := fmt.Sprintf("Cursor position: %d\nPress q to quit.\n", m.cursor)
-	mmrLine := ""
+
+	mmrLine := "Loading...\n"
 	if m.mmr != nil {
 		update := m.mmr["LatestCompetitiveUpdate"].(map[string]any)
 		rr := update["RankedRatingAfterUpdate"].(float64)
 		movement := update["CompetitiveMovement"].(string)
 		mmrLine = fmt.Sprintf("Ranked Rating: %.0f (%s)\n", rr, movement)
 	}
-	partyLine := ""
+
+	partyLine := "Loading...\n"
 	if m.party != nil {
 		members := m.party["Members"].([]any)
 		partyLine = fmt.Sprintf("Party size: %d\n", len(members))
@@ -81,15 +84,24 @@ func (m model) View() string {
 			partyLine += fmt.Sprintf("  %s\n", member["Subject"].(string))
 		}
 	}
-	loadoutsLines := ""
-	for _, l := range m.loadouts {
-		loadoutsLines += fmt.Sprintf("%s playing %s, skins: %v\n", l.Subject, l.AgentName, l.Skins)
+
+	var loadoutsLines strings.Builder
+	switch {
+	case len(m.loadouts) > 0:
+		for _, l := range m.loadouts {
+			fmt.Fprintf(&loadoutsLines, "%s playing %s, skins: %v\n", l.Subject, l.AgentName, l.Skins)
+		}
+	case m.err != nil:
+	default:
+		loadoutsLines.WriteString("Loading...\n")
 	}
+
 	errLine := ""
 	if m.err != nil {
 		errLine = fmt.Sprintf("Error: %v\n", m.err)
 	}
-	return cursorLine + mmrLine + partyLine + loadoutsLines + errLine
+
+	return cursorLine + mmrLine + partyLine + loadoutsLines.String() + errLine
 }
 
 func runTUI() {
