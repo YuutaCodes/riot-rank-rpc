@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"crypto/tls"
@@ -145,7 +145,7 @@ func fetchClientVersion() (string, error) {
 // regionToShard maps Riot's account-region codes (as returned by the local
 // region-locale endpoint, e.g. "EUW") to Valorant's actual shard codes used
 // in PD/GLZ server URLs ("eu", "na", "ap", "kr"). This is a best-guess table
-// from community documentation, NOT verified against a real Valorant client â€”
+// from community documentation, NOT verified against a real Valorant client.
 // confirm and adjust once tested on a machine with Valorant installed.
 var regionToShard = map[string]string{
 	"EUW":   "eu",
