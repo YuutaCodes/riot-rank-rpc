@@ -78,6 +78,13 @@ func main() {
 		return
 	}
 
+	skins, err := fetchWeaponSkins()
+	if err != nil {
+		fmt.Println("failed to fetch weapon skins:", err)
+		return
+	}
+	skinData := skins["data"].([]interface{})
+
 	fmt.Printf("%+v\n", lf)
 	fmt.Printf("%+v\n", entitlements)
 	fmt.Printf("%+v\n", regionLocale)
@@ -92,4 +99,6 @@ func main() {
 	fmt.Printf("%+v\n", coreGameMatchID)
 	fmt.Println()
 	fmt.Printf("%+v\n", loadouts)
+	fmt.Println("total skins:", len(skinData))
+	fmt.Printf("%+v\n", skinData[0])
 }

@@ -27,3 +27,20 @@ func fetchClientVersion() (string, error) {
 
 	return result.Data.RiotClientVersion, nil
 }
+
+func fetchWeaponSkins() (map[string]interface{}, error) {
+	resp, err := http.DefaultClient.Get("https://valorant-api.com/v1/weapons/skins")
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var result map[string]interface{}
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
