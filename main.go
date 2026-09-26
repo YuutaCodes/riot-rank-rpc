@@ -60,7 +60,7 @@ func main() {
 		return
 	}
 
-	pregameMatch, err := fetchPregameMatch(shardFromRegion(regionLocale.Region), pregameMatchID.MatchID, entitlements.AccessToken, entitlements.Token)
+	_, err = fetchPregameMatch(shardFromRegion(regionLocale.Region), pregameMatchID.MatchID, entitlements.AccessToken, entitlements.Token)
 	if err != nil {
 		fmt.Println("failed to fetch pregame match:", err)
 		return
@@ -83,30 +83,24 @@ func main() {
 		fmt.Println("failed to fetch weapon skins:", err)
 		return
 	}
-	skinData := skins["data"].([]interface{})
+	skinIndex := buildSkinNameIndex(skins["data"].([]any))
 
-	skinIndex := buildSkinNameIndex(skinData)
+	agents, err := fetchAgents()
+	if err != nil {
+		fmt.Println("failed to fetch agents:", err)
+		return
+	}
+	agentIndex := buildAgentNameIndex(agents["data"].([]any))
+
+	summaries := summarizeLoadouts(loadouts, skinIndex, agentIndex)
 
 	fmt.Printf("%+v\n", lf)
 	fmt.Println()
-	fmt.Printf("%+v\n", entitlements)
+	fmt.Printf("%+v\n", mmr["LatestCompetitiveUpdate"])
 	fmt.Println()
-	fmt.Printf("%+v\n", regionLocale)
+	fmt.Printf("%+v\n", party["Members"])
 	fmt.Println()
-	fmt.Printf("%+v\n", mmr)
-	fmt.Println()
-	fmt.Printf("%+v\n", partyID)
-	fmt.Printf("%+v\n", party)
-	fmt.Println()
-	fmt.Printf("%+v\n", pregameMatchID)
-	fmt.Println()
-	fmt.Printf("%+v\n", pregameMatch)
-	fmt.Println()
-	fmt.Printf("%+v\n", coreGameMatchID)
-	fmt.Println()
-	fmt.Printf("%+v\n", loadouts)
-	fmt.Println("total skins:", len(skinData))
-	fmt.Printf("%+v\n", skinData[0])
-	fmt.Println()
-	fmt.Println(skinIndex["f20bdd80-4cbf-67a8-106e-72bbf94336aa"])
+	for _, s := range summaries {
+		fmt.Printf("%s playing %s, skins: %v\n", s.Subject, s.AgentName, s.Skins)
+	}
 }
