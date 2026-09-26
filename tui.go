@@ -11,6 +11,7 @@ type model struct {
 	cursor int
 	mmr    map[string]any
 	err    error
+	party  map[string]any
 }
 
 type mmrMsg struct {
@@ -18,38 +19,13 @@ type mmrMsg struct {
 	Err  error
 }
 
-func fetchMMRCmd() tea.Msg {
-	path := os.Getenv("LOCALAPPDATA") + `\Riot Games\Riot Client\Config\lockfile`
-	data, err := os.ReadFile(path)
-
-	if err != nil {
-		return mmrMsg{Err: err}
-	}
-
-	lf, err := parseLockfile(string(data))
-	if err != nil {
-		return mmrMsg{Err: err}
-	}
-
-	entitlements, err := fetchEntitlements(lf)
-	if err != nil {
-		return mmrMsg{Err: err}
-	}
-
-	regionLocale, err := fetchRegionLocale(lf)
-	if err != nil {
-		return mmrMsg{Err: err}
-	}
-	mmr, err := fetchMMR(shardFromRegion(regionLocale.Region), entitlements.Subject, entitlements.AccessToken, entitlements.Token)
-	if err != nil {
-		return mmrMsg{Err: err}
-	}
-
-	return mmrMsg{Data: mmr}
+type partyMsg struct {
+	Data map[string]any
+	Err  error
 }
 
 func (m model) Init() tea.Cmd {
-	return fetchMMRCmd
+	return tea.Batch(fetchMMRCmd, fetchPartyCmd)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -71,6 +47,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case mmrMsg:
 		m.mmr = msg.Data
 		m.err = msg.Err
+	case partyMsg:
+		m.party = msg.Data
+		m.err = msg.Err
 	}
 	return m, nil
 }
@@ -84,11 +63,15 @@ func (m model) View() string {
 		movement := update["CompetitiveMovement"].(string)
 		mmrLine = fmt.Sprintf("Ranked Rating: %.0f (%s)\n", rr, movement)
 	}
+	partyLine := ""
+	if m.party != nil {
+		partyLine = fmt.Sprintf("Party: %v\n", m.party)
+	}
 	errLine := ""
 	if m.err != nil {
 		errLine = fmt.Sprintf("Error: %v\n", m.err)
 	}
-	return cursorLine + mmrLine + errLine
+	return cursorLine + mmrLine + partyLine + errLine
 }
 
 func runTUI() {
@@ -97,4 +80,62 @@ func runTUI() {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
+}
+
+func authenticate() (EntitlementsToken, string, error) {
+	path := os.Getenv("LOCALAPPDATA") + `\Riot Games\Riot Client\Config\lockfile`
+	data, err := os.ReadFile(path)
+
+	if err != nil {
+		return EntitlementsToken{}, "", fmt.Errorf("could not read lockfile (is the Riot Client running?): %w", err)
+	}
+
+	lf, err := parseLockfile(string(data))
+	if err != nil {
+		return EntitlementsToken{}, "", fmt.Errorf("failed to parse lockfile: %w", err)
+	}
+
+	entitlements, err := fetchEntitlements(lf)
+	if err != nil {
+		return EntitlementsToken{}, "", fmt.Errorf("failed to fetch entitlements: %w", err)
+	}
+
+	regionLocale, err := fetchRegionLocale(lf)
+	if err != nil {
+		return EntitlementsToken{}, "", fmt.Errorf("failed to fetch region locale: %w", err)
+	}
+	return entitlements, shardFromRegion(regionLocale.Region), nil
+}
+
+func fetchMMRCmd() tea.Msg {
+	entitlements, shard, err := authenticate()
+	if err != nil {
+		return mmrMsg{Err: err}
+	}
+
+	mmr, err := fetchMMR(shard, entitlements.Subject, entitlements.AccessToken, entitlements.Token)
+	if err != nil {
+		return mmrMsg{Err: err}
+	}
+
+	return mmrMsg{Data: mmr}
+}
+
+func fetchPartyCmd() tea.Msg {
+	entitlements, shard, err := authenticate()
+	if err != nil {
+		return partyMsg{Err: err}
+	}
+
+	partyID, err := fetchPartyID(shard, entitlements.Subject, entitlements.AccessToken, entitlements.Token)
+	if err != nil {
+		return partyMsg{Err: err}
+	}
+
+	party, err := fetchParty(shard, partyID, entitlements.AccessToken, entitlements.Token)
+	if err != nil {
+		return partyMsg{Err: err}
+	}
+
+	return partyMsg{Data: party}
 }
