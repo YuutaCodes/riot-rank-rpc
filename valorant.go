@@ -234,6 +234,54 @@ func fetchParty(shard string, partyID string, accessToken string, entitlementTok
 	return result, nil
 }
 
+type PlayerName struct {
+	Subject  string
+	GameName string
+	TagLine  string
+}
+
+// fetchPlayerNames resolves puuids to real Riot IDs via the PD-hosted name service.
+// Unlike every other PD/GLZ call here, this one is a POST with a JSON array body.
+func fetchPlayerNames(shard string, puuids []string, accessToken string, entitlementToken string) ([]PlayerName, error) {
+	clientVersion, err := fetchClientVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("https://pd.%s.a.pvp.net/name-service/v2/players", shard)
+
+	body, err := json.Marshal(puuids)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", url, strings.NewReader(string(body)))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("X-Riot-Entitlements-JWT", entitlementToken)
+	req.Header.Set("X-Riot-ClientPlatform", clientPlatform)
+	req.Header.Set("X-Riot-ClientVersion", clientVersion)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var result []PlayerName
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 type MatchIDResponse struct {
 	MatchID string `json:"MatchID"`
 }

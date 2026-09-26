@@ -14,6 +14,7 @@ type model struct {
 	err      error
 	party    map[string]any
 	loadouts []PlayerLoadout
+	names    map[string]string
 }
 
 type mmrMsg struct {
@@ -28,6 +29,11 @@ type partyMsg struct {
 
 type loadoutsMsg struct {
 	Data []PlayerLoadout
+	Err  error
+}
+
+type namesMsg struct {
+	Data map[string]string
 	Err  error
 }
 
@@ -57,8 +63,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case partyMsg:
 		m.party = msg.Data
 		m.err = msg.Err
+		if msg.Data != nil {
+			members := msg.Data["Members"].([]any)
+			var puuids []string
+			for _, mem := range members {
+				member := mem.(map[string]any)
+				puuids = append(puuids, member["Subject"].(string))
+			}
+			return m, fetchNamesCmd(puuids)
+		}
 	case loadoutsMsg:
 		m.loadouts = msg.Data
+		m.err = msg.Err
+	case namesMsg:
+		m.names = msg.Data
 		m.err = msg.Err
 	}
 	return m, nil
@@ -81,7 +99,12 @@ func (m model) View() string {
 		partyLine = fmt.Sprintf("Party size: %d\n", len(members))
 		for _, mem := range members {
 			member := mem.(map[string]any)
-			partyLine += fmt.Sprintf("  %s\n", member["Subject"].(string))
+			subject := member["Subject"].(string)
+			name := subject
+			if resolved, ok := m.names[subject]; ok {
+				name = resolved
+			}
+			partyLine += fmt.Sprintf("  %s\n", name)
 		}
 	}
 
@@ -89,7 +112,11 @@ func (m model) View() string {
 	switch {
 	case len(m.loadouts) > 0:
 		for _, l := range m.loadouts {
-			fmt.Fprintf(&loadoutsLines, "%s playing %s, skins: %v\n", l.Subject, l.AgentName, l.Skins)
+			name := l.Subject
+			if resolved, ok := m.names[name]; ok {
+				name = resolved
+			}
+			fmt.Fprintf(&loadoutsLines, "%s playing %s, skins: %v\n", name, l.AgentName, l.Skins)
 		}
 	case m.err != nil:
 	default:
@@ -168,6 +195,30 @@ func fetchPartyCmd() tea.Msg {
 	}
 
 	return partyMsg{Data: party}
+}
+
+// fetchNamesCmd returns a tea.Cmd (a func() tea.Msg) closing over puuids -- needed because
+// tea.Cmd itself takes no arguments, but which puuids to resolve is only known once the
+// party response arrives (see the case partyMsg branch in Update).
+func fetchNamesCmd(puuids []string) tea.Cmd {
+	return func() tea.Msg {
+		entitlements, shard, err := authenticate()
+		if err != nil {
+			return namesMsg{Err: err}
+		}
+
+		names, err := fetchPlayerNames(shard, puuids, entitlements.AccessToken, entitlements.Token)
+		if err != nil {
+			return namesMsg{Err: err}
+		}
+
+		index := map[string]string{}
+		for _, n := range names {
+			index[n.Subject] = fmt.Sprintf("%s#%s", n.GameName, n.TagLine)
+		}
+
+		return namesMsg{Data: index}
+	}
 }
 
 func fetchLoadoutsCmd() tea.Msg {
