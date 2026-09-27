@@ -1148,17 +1148,15 @@ func fetchGameStateCmd() tea.Cmd {
 				return gameStateMsg{Err: err}
 			}
 
-			skins, err := fetchWeaponSkins()
+			skinIndex, err := cachedSkinIndex()
 			if err != nil {
 				return gameStateMsg{Err: err}
 			}
-			skinIndex := buildSkinIndex(skins["data"].([]any))
 
-			agents, err := fetchAgents()
+			agentIndex, err := cachedAgentIndex()
 			if err != nil {
 				return gameStateMsg{Err: err}
 			}
-			agentIndex := buildAgentNameIndex(agents["data"].([]any))
 
 			data := matchData{Loadouts: loadouts, SkinIndex: skinIndex, AgentIndex: agentIndex}
 
@@ -1177,10 +1175,8 @@ func fetchGameStateCmd() tea.Cmd {
 			if err != nil {
 				return msg
 			}
-			agentIndex := map[string]string{}
-			if agents, err := fetchAgents(); err == nil {
-				agentIndex = buildAgentNameIndex(agents["data"].([]any))
-			}
+			// Without agent names the roster still shows, just with blank agents.
+			agentIndex, _ := cachedAgentIndex()
 			msg.Pregame = pregameRows(match, agentIndex)
 			return msg
 		}

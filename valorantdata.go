@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
@@ -51,6 +52,52 @@ func fetchClientVersion() (string, error) {
 	}
 
 	return result.Data.RiotClientVersion, nil
+}
+
+// Static game data only changes with a patch, so it's fetched once per run.
+// The maps are never written after they're built, so sharing them across goroutines is safe.
+var (
+	staticDataMu sync.Mutex
+	skinIndex    map[string]SkinInfo
+	agentIndex   map[string]string
+)
+
+func cachedSkinIndex() (map[string]SkinInfo, error) {
+	staticDataMu.Lock()
+	defer staticDataMu.Unlock()
+	if skinIndex != nil {
+		return skinIndex, nil
+	}
+
+	skins, err := fetchWeaponSkins()
+	if err != nil {
+		return nil, err
+	}
+	data, ok := skins["data"].([]any)
+	if !ok {
+		return nil, errors.New("weapon skins response has no data")
+	}
+	skinIndex = buildSkinIndex(data)
+	return skinIndex, nil
+}
+
+func cachedAgentIndex() (map[string]string, error) {
+	staticDataMu.Lock()
+	defer staticDataMu.Unlock()
+	if agentIndex != nil {
+		return agentIndex, nil
+	}
+
+	agents, err := fetchAgents()
+	if err != nil {
+		return nil, err
+	}
+	data, ok := agents["data"].([]any)
+	if !ok {
+		return nil, errors.New("agents response has no data")
+	}
+	agentIndex = buildAgentNameIndex(data)
+	return agentIndex, nil
 }
 
 func fetchWeaponSkins() (map[string]any, error) {
