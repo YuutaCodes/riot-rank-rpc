@@ -98,7 +98,7 @@ func fetchRegionLocale(lf Lockfile) (RegionLocale, error) {
 const clientPlatform = "ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9"
 
 func fetchMMR(shard string, puuid string, accessToken string, entitlementToken string) (map[string]any, error) {
-	clientVersion, err := fetchClientVersion()
+	clientVersion, err := cachedClientVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func fetchMMR(shard string, puuid string, accessToken string, entitlementToken s
 }
 
 func fetchMatchHistory(shard string, puuid string, accessToken string, entitlementToken string) (map[string]any, error) {
-	clientVersion, err := fetchClientVersion()
+	clientVersion, err := cachedClientVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func fetchMatchHistory(shard string, puuid string, accessToken string, entitleme
 }
 
 func fetchMatchDetails(shard string, matchID string, accessToken string, entitlementToken string) (map[string]any, error) {
-	clientVersion, err := fetchClientVersion()
+	clientVersion, err := cachedClientVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +292,7 @@ func readClientVersionFromLog() (string, error) {
 }
 
 func fetchParty(shard string, partyID string, accessToken string, entitlementToken string) (map[string]any, error) {
-	clientVersion, err := fetchClientVersion()
+	clientVersion, err := cachedClientVersion()
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +336,7 @@ type PlayerName struct {
 
 // fetchPlayerNames turns puuids into Riot IDs. Sent as a PUT with a JSON array body.
 func fetchPlayerNames(shard string, puuids []string, accessToken string, entitlementToken string) ([]PlayerName, error) {
-	clientVersion, err := fetchClientVersion()
+	clientVersion, err := cachedClientVersion()
 	if err != nil {
 		return nil, err
 	}

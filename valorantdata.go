@@ -5,7 +5,31 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 )
+
+var (
+	clientVersionMu     sync.Mutex
+	clientVersionCached string
+)
+
+func cachedClientVersion() (string, error) {
+	clientVersionMu.Lock()
+
+	defer clientVersionMu.Unlock()
+
+	if clientVersionCached != "" {
+		return clientVersionCached, nil
+	}
+
+	fetchClientVersion, err := fetchClientVersion()
+	if err != nil {
+		return "", err
+	}
+
+	clientVersionCached = fetchClientVersion
+	return clientVersionCached, nil
+}
 
 // fetchClientVersion returns the Riot Client version, not the exact game build.
 func fetchClientVersion() (string, error) {
