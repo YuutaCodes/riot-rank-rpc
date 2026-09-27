@@ -9,7 +9,8 @@ const settingsFile = "settings.json"
 
 // Settings are user choices that persist between runs.
 type Settings struct {
-	PrimaryWeaponID string `json:"primaryWeaponID"`
+	PrimaryWeaponID string   `json:"primaryWeaponID"`
+	HiddenColumns   []string `json:"hiddenColumns,omitempty"`
 }
 
 // loadSettings reads saved settings, falling back to defaults if the file is missing or invalid.
@@ -22,8 +23,11 @@ func loadSettings() Settings {
 	}
 
 	var s Settings
-	if err := json.Unmarshal(data, &s); err != nil || s.PrimaryWeaponID == "" {
+	if err := json.Unmarshal(data, &s); err != nil {
 		return defaults
+	}
+	if s.PrimaryWeaponID == "" {
+		s.PrimaryWeaponID = defaults.PrimaryWeaponID
 	}
 
 	return s

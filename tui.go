@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"encoding/json"
@@ -50,6 +50,12 @@ type model struct {
 	skinArt        map[string]string
 	skinImages     map[string]image.Image // nil means the download failed.
 	skinArtPending map[string]bool
+
+	// Settings tab.
+	settingsCategory int
+	settingsFocus    int
+	columnCursor     int
+	hiddenColumns    map[string]bool // Match tab columns the user turned off.
 }
 
 type skinImageMsg struct {
@@ -163,9 +169,15 @@ func newModel() model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = spinnerStyle
+	settings := loadSettings()
+	hidden := map[string]bool{}
+	for _, c := range settings.HiddenColumns {
+		hidden[c] = true
+	}
 	return model{
 		spin:            s,
-		primaryWeaponID: loadSettings().PrimaryWeaponID,
+		primaryWeaponID: settings.PrimaryWeaponID,
+		hiddenColumns:   hidden,
 		skinArt:         map[string]string{},
 		skinImages:      map[string]image.Image{},
 		skinArtPending:  map[string]bool{},
@@ -261,8 +273,9 @@ var tabLabels = []string{"Match", "Skins", "Settings"}
 
 // buildTabBar renders the tab row and returns each tab's column range.
 // View and Update both use it, so mouse clicks always match what's drawn.
-// hovered is the tab under the mouse, or -1.
-func buildTabBar(active, hovered, width int) (string, [][2]int) {
+// hovered is the tab under the mouse, or -1. dimSkins greys out the Skins tab while
+// there's no match to show.
+func buildTabBar(active, hovered, width int, dimSkins bool) (string, [][2]int) {
 	var rendered []string
 	var bounds [][2]int
 	x := 0
@@ -274,6 +287,10 @@ func buildTabBar(active, hovered, width int) (string, [][2]int) {
 			style = activeTabStyle
 		case hovered:
 			style = style.Foreground(lipgloss.Color("252")).Background(hoverBackground)
+		default:
+			if dimSkins && i == tabSkins {
+				style = style.Foreground(lipgloss.Color("237"))
+			}
 		}
 		cell := style.Render(label)
 		cellWidth := lipgloss.Width(cell)
@@ -298,10 +315,12 @@ func buildTabBar(active, hovered, width int) (string, [][2]int) {
 const (
 	hoverNone = iota
 	hoverTab
-	hoverSetting     // index is a weapon in m.weapons
-	hoverSkinsPlayer // subject is the player
-	hoverSkinsWeapon // index is a row in the weapon column
-	hoverMatchSkin   // subject is the player
+	hoverSetting         // index is a weapon in m.weapons
+	hoverSkinsPlayer     // subject is the player
+	hoverSkinsWeapon     // index is a row in the weapon column
+	hoverMatchSkin       // subject is the player
+	hoverSettingCategory // index is a settings category
+	hoverSettingColumn   // index is in optionalColumns
 )
 
 type hoverTarget struct {
@@ -314,7 +333,7 @@ type hoverTarget struct {
 // hitboxes as the click handlers, so hover and click always agree.
 func (m model) hoverAt(x, y int) hoverTarget {
 	if y < tabBarHeight {
-		_, bounds := buildTabBar(m.activeTab, -1, m.width)
+		_, bounds := buildTabBar(m.activeTab, -1, m.width, m.gameState != StateInGame)
 		for i, b := range bounds {
 			if x >= b[0] && x < b[1] {
 				return hoverTarget{kind: hoverTab, index: i}
@@ -344,12 +363,7 @@ func (m model) hoverAt(x, y int) hoverTarget {
 			}
 		}
 	case tabSettings:
-		_, hits := m.buildSettings()
-		for _, h := range hits {
-			if y == h.y && x >= h.x0 && x < h.x1 {
-				return hoverTarget{kind: hoverSetting, index: h.index}
-			}
-		}
+		return m.settingsHoverAt(x, y)
 	}
 	return hoverTarget{}
 }
@@ -385,7 +399,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.requestSkinArt()
 		}
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && msg.Y < tabBarHeight {
-			_, bounds := buildTabBar(m.activeTab, -1, m.width)
+			_, bounds := buildTabBar(m.activeTab, -1, m.width, m.gameState != StateInGame)
 			for i, b := range bounds {
 				if msg.X >= b[0] && msg.X < b[1] {
 					m.activeTab = i
@@ -429,18 +443,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		// Clicking a weapon on the Settings tab sets it as primary, like enter.
 		if m.activeTab == tabSettings && msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && msg.Y >= tabBarHeight {
-			_, hits := m.buildSettings()
-			for _, h := range hits {
-				if msg.Y == h.y && msg.X >= h.x0 && msg.X < h.x1 {
-					m.settingsCursor = h.index
-					return m.setPrimaryWeapon(h.index)
-				}
-			}
+			return m.handleSettingsClick(msg.X, msg.Y)
 		}
 
 	case tea.KeyMsg:
+		if m.activeTab == tabSettings {
+			if next, cmd, ok := m.handleSettingsKey(msg.String()); ok {
+				return next, cmd
+			}
+		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -456,9 +468,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.activeTab == tabMatch && m.cursor > 0 {
 				m.cursor--
 			}
-			if m.activeTab == tabSettings && m.settingsCursor > 0 {
-				m.settingsCursor--
-			}
 
 		case "down", "j":
 			if m.activeTab == tabSkins {
@@ -468,29 +477,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.activeTab == tabMatch && m.cursor < len(m.matchSubjects())-1 {
 				m.cursor++
 			}
-			if m.activeTab == tabSettings && m.settingsCursor < len(m.weapons)-1 {
-				m.settingsCursor++
-			}
 
 		case "left", "h":
 			if m.activeTab == tabSkins {
 				m.skinsFocus = skinsFocusPlayers
 			}
-			if m.activeTab == tabSettings {
-				m.settingsCursor = prevCategoryStart(m.weapons, m.settingsCursor)
-			}
 
 		case "right", "l":
 			if m.activeTab == tabSkins {
 				m.skinsFocus = skinsFocusWeapons
-			}
-			if m.activeTab == tabSettings {
-				m.settingsCursor = nextCategoryStart(m.weapons, m.settingsCursor)
-			}
-
-		case "enter":
-			if m.activeTab == tabSettings && m.settingsCursor < len(m.weapons) {
-				return m.setPrimaryWeapon(m.settingsCursor)
 			}
 
 		case "tab":
@@ -650,7 +645,7 @@ func (m model) View() string {
 	if m.hover.kind == hoverTab {
 		hoveredTab = m.hover.index
 	}
-	tabBar, _ := buildTabBar(m.activeTab, hoveredTab, m.width)
+	tabBar, _ := buildTabBar(m.activeTab, hoveredTab, m.width, m.gameState != StateInGame)
 
 	var content string
 	switch m.activeTab {
@@ -857,7 +852,7 @@ func (m model) buildMatchView() (string, []skinsHitbox) {
 
 	var b strings.Builder
 	var hits []skinsHitbox
-	withSkin := m.gameState == StateInGame
+	withSkin := m.gameState == StateInGame && !m.hiddenColumns["Skin"]
 	n := 0
 	for i, s := range m.matchSections() {
 		if i > 0 {
@@ -892,10 +887,17 @@ func (m model) buildMatchView() (string, []skinsHitbox) {
 // n numbers anonymous players across tables, so they read Player 1, Player 2, ...
 func (m model) renderRosterTable(rows []rosterRow, selected string, withSkin bool, topY int, n *int) (string, []skinsHitbox) {
 	withAgent := m.gameState != StateMenus
-	headers := []string{"Name", "Rank", "Peak Rank", "HS", "WR", "Level", "ΔRR"}
+	var columns []string
 	if withAgent {
-		headers = append([]string{"Agent"}, headers...)
+		columns = append(columns, "Agent")
 	}
+	columns = append(columns, "Name")
+	for _, c := range optionalColumns {
+		if c != "Skin" && !m.hiddenColumns[c] {
+			columns = append(columns, c)
+		}
+	}
+	headers := append([]string{}, columns...)
 	weaponColumn := "Vandal"
 	for _, w := range m.weapons {
 		if w.UUID == m.primaryWeaponID {
@@ -936,9 +938,13 @@ func (m model) renderRosterTable(rows []rosterRow, selected string, withSkin boo
 		if m.hidden(r) {
 			rank, peak, hs, wr, delta, level = "Hidden", "-", "-", "-", "-", "-"
 		}
-		cells := []string{m.displayName(r, *n), rank, peak, hs, wr, level, delta}
-		if withAgent {
-			cells = append([]string{r.Agent}, cells...)
+		values := map[string]string{
+			"Agent": r.Agent, "Name": m.displayName(r, *n), "Rank": rank, "Peak Rank": peak,
+			"HS": hs, "WR": wr, "Level": level, "ΔRR": delta,
+		}
+		var cells []string
+		for _, c := range columns {
+			cells = append(cells, values[c])
 		}
 		if withSkin {
 			cells = append(cells, strings.TrimSuffix(r.Skin, " "+weaponColumn))
@@ -1008,141 +1014,6 @@ func dumpDebugJSON(m model) error {
 		return err
 	}
 	return os.WriteFile("debug_dump.json", data, 0644)
-}
-
-// weaponHitbox is where one weapon name is drawn on screen: row y, columns [x0, x1).
-type weaponHitbox struct {
-	index  int
-	x0, x1 int
-	y      int
-}
-
-// settingsContentX and settingsContentY are where the box's content starts on screen:
-// tab bar rows, then the box's top border and padding (1 row) / left border and padding (2 cols).
-const (
-	settingsContentX = 1 + 2
-	settingsContentY = tabBarHeight + 1 + 1
-)
-
-func (m model) settingsView() string {
-	view, _ := m.buildSettings()
-	return view
-}
-
-// buildSettings renders the settings tab and returns each weapon's screen position.
-// View and Update both use it, so mouse clicks always match what's drawn.
-func (m model) buildSettings() (string, []weaponHitbox) {
-	if len(m.weapons) == 0 {
-		return m.spin.View() + " Loading weapons...\n", nil
-	}
-
-	var b strings.Builder
-	b.WriteString(headerStyle.Render("Primary weapon (shown as a column in the loadouts tab)"))
-	b.WriteString("\n\n")
-	gridY := settingsContentY + strings.Count(b.String(), "\n")
-
-	var columns []string
-	// colItems[c] holds (weapon index, line inside column c) for each weapon in it.
-	var colItems [][][2]int
-	var items [][2]int
-	line := 0
-	var col strings.Builder
-	for i, w := range m.weapons {
-		if i == 0 || w.Category != m.weapons[i-1].Category {
-			if i > 0 {
-				columns = append(columns, weaponColumnStyle.Render(col.String()))
-				colItems = append(colItems, items)
-				items, line = nil, 0
-				col.Reset()
-			}
-			line++
-			col.WriteString(weaponCategoryStyle.Render(strings.ToUpper(w.Category)))
-			col.WriteString("\n")
-		}
-
-		prefix := "  "
-		style := normalRowStyle
-		if i == m.settingsCursor {
-			prefix = "> "
-			style = selectedRowStyle
-		}
-		if m.hover == (hoverTarget{kind: hoverSetting, index: i}) {
-			style = style.Background(hoverBackground)
-		}
-		marker := ""
-		if w.UUID == m.primaryWeaponID {
-			marker = " *"
-		}
-		items = append(items, [2]int{i, line})
-		line++
-		col.WriteString(prefix)
-		col.WriteString(style.Render(w.Name + marker))
-		col.WriteString("\n")
-	}
-	columns = append(columns, weaponColumnStyle.Render(col.String()))
-	colItems = append(colItems, items)
-
-	maxWidth := m.width - 10
-	var rows []string
-	var row []string
-	var hits []weaponHitbox
-	rowWidth := 0
-	rowY := gridY
-	for ci, c := range columns {
-		w := lipgloss.Width(c)
-		if len(row) > 0 && m.width > 0 && rowWidth+w > maxWidth {
-			joined := lipgloss.JoinHorizontal(lipgloss.Top, row...)
-			rows = append(rows, joined)
-			rowY += lipgloss.Height(joined)
-			row, rowWidth = nil, 0
-		}
-		x := settingsContentX + rowWidth
-		for _, it := range colItems[ci] {
-			hits = append(hits, weaponHitbox{index: it[0], x0: x, x1: x + w, y: rowY + it[1]})
-		}
-		row = append(row, c)
-		rowWidth += w
-	}
-	rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, row...))
-	b.WriteString(lipgloss.JoinVertical(lipgloss.Left, rows...))
-
-	b.WriteString("\n* current   (click a weapon to select it, or tab: switch tabs, arrows: select, enter: set as default)\n")
-	return b.String(), hits
-}
-
-// setPrimaryWeapon saves weapon i as the primary weapon and re-summarizes the cached match.
-func (m model) setPrimaryWeapon(i int) (tea.Model, tea.Cmd) {
-	m.primaryWeaponID = m.weapons[i].UUID
-	m.err = saveSettings(Settings{PrimaryWeaponID: m.primaryWeaponID})
-	m.loadouts = m.match.summarize(m.primaryWeaponID)
-	return m, nil
-}
-
-func nextCategoryStart(weapons []WeaponOption, i int) int {
-	for j := i + 1; j < len(weapons); j++ {
-		if weapons[j].Category != weapons[i].Category {
-			return j
-		}
-	}
-	return i
-}
-
-func prevCategoryStart(weapons []WeaponOption, i int) int {
-	if i <= 0 || i >= len(weapons) {
-		return 0
-	}
-	j := i
-	for j > 0 && weapons[j-1].Category == weapons[i].Category {
-		j--
-	}
-	if j == 0 {
-		return 0
-	}
-	prev := weapons[j-1].Category
-	for j > 0 && weapons[j-1].Category == prev {
-		j--
-	}
-	return j
 }
 
 func runTUI() {
