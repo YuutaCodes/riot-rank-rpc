@@ -645,6 +645,8 @@ func (m model) View() string {
 		// blank space below the status bar.
 		box = box.Height(m.height - tabBarHeight - 1 - 1 - 2)
 	}
+	// A side effect, but only View knows where the skin image ends up.
+	overlay.Set(m.skinOverlay())
 	return tabBar + "\n" + box.Render(content) + "\n" + m.statusBar()
 }
 
@@ -1105,7 +1107,9 @@ func prevCategoryStart(weapons []WeaponOption, i int) int {
 }
 
 func runTUI() {
-	p := tea.NewProgram(newModel(), tea.WithAltScreen(), tea.WithMouseAllMotion())
+	// Must run before Bubble Tea takes over stdin.
+	graphics = detectGraphics()
+	p := tea.NewProgram(newModel(), tea.WithAltScreen(), tea.WithMouseAllMotion(), tea.WithOutput(overlay))
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)

@@ -189,7 +189,9 @@ func (m model) requestSkinArt() tea.Cmd {
 		return nil
 	}
 	if img, ok := m.skinImages[skin.Icon]; ok {
-		if img != nil {
+		if img != nil && graphics.sixel {
+			m.skinArt[key], _ = renderSixel(img, cols, rows)
+		} else if img != nil {
 			m.skinArt[key] = renderSkinArt(img, cols, rows)
 		}
 		return nil
@@ -332,8 +334,34 @@ func (m model) skinPreview() string {
 		art = errorStyle.Render("Image unavailable")
 	case !ok:
 		art = m.spin.View() + " Loading image..."
+	case graphics.sixel:
+		// sixelOverlay draws the image over this blank area.
+		art = strings.TrimSuffix(strings.Repeat(strings.Repeat(" ", cols)+"\n", rows), "\n")
 	}
 
 	name := headerStyle.Render(ansi.Truncate(skin.Name, cols, "…"))
 	return name + "\n\n" + art
+}
+
+// skinOverlay must match the preview position in buildSkins.
+func (m model) skinOverlay() overlayImage {
+	if !graphics.sixel || m.activeTab != tabSkins || m.gameState != StateInGame || len(m.loadouts) == 0 {
+		return overlayImage{}
+	}
+	skin, ok := m.selectedSkin()
+	cols, rows := m.skinArtSize()
+	if !ok || cols == 0 {
+		return overlayImage{}
+	}
+	seq := m.skinArt[skinArtKey(skin.Icon, cols, rows)]
+	if seq == "" {
+		return overlayImage{}
+	}
+	return overlayImage{
+		seq:  seq,
+		x:    settingsContentX + skinsPlayerPaneWidth + skinsWeaponPaneWidth,
+		y:    settingsContentY + 2,
+		cols: cols,
+		rows: rows,
+	}
 }
