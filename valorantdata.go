@@ -75,22 +75,22 @@ func buildSkinIndex(skins []any) map[string]SkinInfo {
 	return index
 }
 
-// skinIconURL picks the first available image: the skin's icon,
-// then its first level's icon, then its first chroma's full render.
+// skinIconURL prefers the chroma full render, because Standard skins have a
+// placeholder cross as their displayIcon.
 func skinIconURL(skin map[string]any) string {
+	if chromas, ok := skin["chromas"].([]any); ok && len(chromas) > 0 {
+		if chroma, ok := chromas[0].(map[string]any); ok {
+			if icon, ok := chroma["fullRender"].(string); ok && icon != "" {
+				return icon
+			}
+		}
+	}
 	if icon, ok := skin["displayIcon"].(string); ok && icon != "" {
 		return icon
 	}
 	if levels, ok := skin["levels"].([]any); ok && len(levels) > 0 {
 		if level, ok := levels[0].(map[string]any); ok {
 			if icon, ok := level["displayIcon"].(string); ok && icon != "" {
-				return icon
-			}
-		}
-	}
-	if chromas, ok := skin["chromas"].([]any); ok && len(chromas) > 0 {
-		if chroma, ok := chromas[0].(map[string]any); ok {
-			if icon, ok := chroma["fullRender"].(string); ok && icon != "" {
 				return icon
 			}
 		}
