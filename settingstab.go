@@ -49,11 +49,6 @@ type settingsHitbox struct {
 	y      int
 }
 
-func (m model) settingsView() string {
-	view, _ := m.buildSettings()
-	return view
-}
-
 // buildSettings renders the settings tab: categories on the left, the chosen category's
 // options on the right. View and Update both use it, so mouse clicks always match what's drawn.
 func (m model) buildSettings() (string, []settingsHitbox) {
@@ -272,7 +267,7 @@ func (m model) handleSettingsKey(key string) (_ tea.Model, _ tea.Cmd, ok bool) {
 
 // handleSettingsClick selects or toggles whatever is at x, y on the settings tab.
 func (m model) handleSettingsClick(x, y int) (tea.Model, tea.Cmd) {
-	_, hits := m.buildSettings()
+	hits := m.hits.settings
 	for _, h := range hits {
 		if y != h.y || x < h.x0 || x >= h.x1 {
 			continue
@@ -297,8 +292,7 @@ func (m model) handleSettingsClick(x, y int) (tea.Model, tea.Cmd) {
 
 // settingsHoverAt maps a settings tab hitbox to a hover target.
 func (m model) settingsHoverAt(x, y int) hoverTarget {
-	_, hits := m.buildSettings()
-	for _, h := range hits {
+	for _, h := range m.hits.settings {
 		if y != h.y || x < h.x0 || x >= h.x1 {
 			continue
 		}

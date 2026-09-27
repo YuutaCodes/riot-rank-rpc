@@ -238,11 +238,6 @@ func (m model) skinsWeaponWindow(total int) (int, int) {
 	return start, start + visible
 }
 
-func (m model) skinsView() string {
-	view, _ := m.buildSkins()
-	return view
-}
-
 // buildSkins is shared by View and Update so clicks match what's drawn.
 func (m model) buildSkins() (string, []skinsHitbox) {
 	if m.gameState != StateInGame || len(m.loadouts) == 0 {

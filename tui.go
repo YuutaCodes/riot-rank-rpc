@@ -57,6 +57,10 @@ type model struct {
 	settingsFocus    int
 	columnCursor     int
 	hiddenColumns    map[string]bool // Match tab columns the user turned off.
+
+	// hits is where View last drew each clickable thing. It's a pointer so View, which
+	// can't change the model, can still record it for the mouse handlers.
+	hits *hitboxes
 }
 
 type skinImageMsg struct {
@@ -179,6 +183,7 @@ func newModel() model {
 		spin:            s,
 		primaryWeaponID: settings.PrimaryWeaponID,
 		hiddenColumns:   hidden,
+		hits:            &hitboxes{},
 		skinArt:         map[string]string{},
 		skinImages:      map[string]image.Image{},
 		skinArtPending:  map[string]bool{},
@@ -330,12 +335,20 @@ type hoverTarget struct {
 	subject string
 }
 
-// hoverAt returns the clickable thing at screen position x, y. It uses the same
-// hitboxes as the click handlers, so hover and click always agree.
+// hitboxes are the clickable regions from the last frame.
+type hitboxes struct {
+	tabs     [][2]int
+	match    []skinsHitbox
+	skins    []skinsHitbox
+	settings []settingsHitbox
+}
+
+// hoverAt returns the clickable thing at screen position x, y. It reads the hitboxes
+// View recorded, so the mouse matches what's on screen without rebuilding the tab on
+// every mouse move.
 func (m model) hoverAt(x, y int) hoverTarget {
 	if y < tabBarHeight {
-		_, bounds := buildTabBar(m.activeTab, -1, m.width, m.gameState != StateInGame)
-		for i, b := range bounds {
+		for i, b := range m.hits.tabs {
 			if x >= b[0] && x < b[1] {
 				return hoverTarget{kind: hoverTab, index: i}
 			}
@@ -346,16 +359,14 @@ func (m model) hoverAt(x, y int) hoverTarget {
 	switch m.activeTab {
 	case tabMatch:
 		if m.gameState == StateInGame {
-			_, hits := m.buildMatchView()
-			for _, h := range hits {
+			for _, h := range m.hits.match {
 				if y == h.y && x >= h.x0 && x < h.x1 {
 					return hoverTarget{kind: hoverMatchSkin, subject: h.subject}
 				}
 			}
 		}
 	case tabSkins:
-		_, hits := m.buildSkins()
-		for _, h := range hits {
+		for _, h := range m.hits.skins {
 			if y == h.y && x >= h.x0 && x < h.x1 {
 				if h.subject != "" {
 					return hoverTarget{kind: hoverSkinsPlayer, subject: h.subject}
@@ -400,7 +411,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.requestSkinArt()
 		}
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && msg.Y < tabBarHeight {
-			_, bounds := buildTabBar(m.activeTab, -1, m.width, m.gameState != StateInGame)
+			bounds := m.hits.tabs
 			for i, b := range bounds {
 				if msg.X >= b[0] && msg.X < b[1] {
 					m.activeTab = i
@@ -413,7 +424,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Clicking a player's skin on the in-game Match table opens them on the Skins tab.
 		if m.activeTab == tabMatch && m.gameState == StateInGame && msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && msg.Y >= tabBarHeight {
-			_, hits := m.buildMatchView()
+			hits := m.hits.match
 			for _, h := range hits {
 				if msg.Y == h.y && msg.X >= h.x0 && msg.X < h.x1 {
 					for i, s := range m.matchSubjects() {
@@ -430,7 +441,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if m.activeTab == tabSkins && msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && msg.Y >= tabBarHeight {
-			_, hits := m.buildSkins()
+			hits := m.hits.skins
 			for _, h := range hits {
 				if msg.Y == h.y && msg.X >= h.x0 && msg.X < h.x1 {
 					if h.subject != "" {
@@ -646,16 +657,18 @@ func (m model) View() string {
 	if m.hover.kind == hoverTab {
 		hoveredTab = m.hover.index
 	}
-	tabBar, _ := buildTabBar(m.activeTab, hoveredTab, m.width, m.gameState != StateInGame)
+	tabBar, tabs := buildTabBar(m.activeTab, hoveredTab, m.width, m.gameState != StateInGame)
 
+	// A side effect, but only View knows where everything ends up.
+	*m.hits = hitboxes{tabs: tabs}
 	var content string
 	switch m.activeTab {
 	case tabMatch:
-		content = m.playerSelectView()
+		content, m.hits.match = m.buildMatchView()
 	case tabSkins:
-		content = m.skinsView()
+		content, m.hits.skins = m.buildSkins()
 	case tabSettings:
-		content = m.settingsView()
+		content, m.hits.settings = m.buildSettings()
 	}
 
 	// Pad between the content and the hint so the hint sits on the box's last line.
@@ -681,11 +694,6 @@ func (m model) View() string {
 	// A side effect, but only View knows where the skin image ends up.
 	overlay.Set(m.skinOverlay())
 	return tabBar + "\n" + box.Render(content) + "\n" + m.statusBar()
-}
-
-func (m model) playerSelectView() string {
-	view, _ := m.buildMatchView()
-	return view
 }
 
 // rosterSection is one titled table on the Match tab, like ALLIES or ENEMIES.
