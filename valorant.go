@@ -1,6 +1,7 @@
 ﻿package main
 
 import (
+	"bufio"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -273,19 +274,23 @@ func fetchPartyID(shard string, puuid string, accessToken string, EntitlementTok
 func readClientVersionFromLog() (string, error) {
 	path := os.Getenv("LOCALAPPDATA") + `\VALORANT\Saved\Logs\ShooterGame.log`
 
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
+	defer file.Close()
 
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "CI server version:") {
-			parts := strings.Split(line, "CI server version:")
-			if len(parts) > 1 {
-				return strings.TrimSpace(parts[1]), nil
-			}
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if _, v, ok := strings.Cut(line, "CI server version:"); ok {
+			return strings.TrimSpace(v), nil
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return "", err
 	}
 
 	return "", errors.New("version line not found in log")
