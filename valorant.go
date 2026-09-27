@@ -56,7 +56,7 @@ func fetchEntitlements(lf Lockfile) (EntitlementsToken, error) {
 		return EntitlementsToken{}, err
 	}
 
-	if resp.StatusCode != http.StatusOK && result.Subject == "" {
+	if resp.StatusCode != http.StatusOK || result.Subject == "" {
 		return EntitlementsToken{}, errNotRunning
 	}
 
