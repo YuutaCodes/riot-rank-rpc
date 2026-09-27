@@ -843,9 +843,11 @@ func (m model) buildMatchView() (string, []skinsHitbox) {
 		if i > 0 {
 			b.WriteString("\n\n")
 		}
-		b.WriteString(weaponCategoryStyle.Render(s.title) + "\n")
+		b.WriteString(weaponCategoryStyle.Render(s.title))
+		b.WriteString("\n")
 		if len(s.rows) == 0 {
-			b.WriteString(m.spin.View() + " Loading...")
+			b.WriteString(m.spin.View())
+			b.WriteString(" Loading...")
 			continue
 		}
 		topY := settingsContentY + strings.Count(b.String(), "\n")
@@ -858,7 +860,12 @@ func (m model) buildMatchView() (string, []skinsHitbox) {
 	if withSkin {
 		hint = "(click a skin to see that player's loadout, or tab: switch tabs, up/down: select player)"
 	}
-	return b.String() + "\n\n" + hint + "\n", hits
+
+	tip := weaponCategoryStyle.Render("Tip:") + " you can use the mouse. Click the tabs at the top to switch screens"
+	if withSkin {
+		tip += ", or click a skin to open that player's loadout"
+	}
+	return b.String() + "\n\n" + tip + ".\n" + hint + "\n", hits
 }
 
 // renderRosterTable draws one player table. topY is the screen row of its top border.
