@@ -7,6 +7,7 @@ import (
 	"image"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -1050,12 +1051,40 @@ func runTUI() {
 // errNotRunning means the lockfile is missing, i.e. the Riot Client isn't open yet.
 var errNotRunning = errors.New("riot client is not running")
 
+// authTTL is far under the ~1 hour token lifetime, and short enough that logging out
+// of the Riot Client (which keeps the same lockfile) is noticed within a couple of polls.
+const authTTL = 2 * time.Minute
+
+type authResult struct {
+	lockfile     string
+	entitlements EntitlementsToken
+	shard        string
+	fetchedAt    time.Time
+}
+
+// authCache holds the last successful authenticate. Only successes are stored, so a
+// failure is retried on the next call.
+var (
+	authMu    sync.Mutex
+	authCache authResult
+)
+
+// authenticate returns tokens and the shard, reusing them until the lockfile changes
+// or authTTL passes. Reading the lockfile itself stays uncached: it's tiny, and it's
+// how a closed or restarted Riot Client is noticed.
 func authenticate() (EntitlementsToken, string, error) {
 	path := os.Getenv("LOCALAPPDATA") + `\Riot Games\Riot Client\Config\lockfile`
 	data, err := os.ReadFile(path)
 
 	if err != nil {
 		return EntitlementsToken{}, "", fmt.Errorf("%w: %w", errNotRunning, err)
+	}
+
+	authMu.Lock()
+	defer authMu.Unlock()
+	// A new lockfile means the Riot Client restarted, so the old tokens are useless.
+	if string(data) == authCache.lockfile && time.Since(authCache.fetchedAt) < authTTL {
+		return authCache.entitlements, authCache.shard, nil
 	}
 
 	lf, err := parseLockfile(string(data))
@@ -1072,7 +1101,14 @@ func authenticate() (EntitlementsToken, string, error) {
 	if err != nil {
 		return EntitlementsToken{}, "", fmt.Errorf("failed to fetch region locale: %w", err)
 	}
-	return entitlements, shardFromRegion(regionLocale.Region), nil
+	shard := shardFromRegion(regionLocale.Region)
+	authCache = authResult{
+		lockfile:     string(data),
+		entitlements: entitlements,
+		shard:        shard,
+		fetchedAt:    time.Now(),
+	}
+	return entitlements, shard, nil
 }
 
 func fetchMMRCmd() tea.Msg {
