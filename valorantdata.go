@@ -22,12 +22,12 @@ func cachedClientVersion() (string, error) {
 		return clientVersionCached, nil
 	}
 
-	fetchClientVersion, err := fetchClientVersion()
+	v, err := fetchClientVersion()
 	if err != nil {
 		return "", err
 	}
 
-	clientVersionCached = fetchClientVersion
+	clientVersionCached = v
 	return clientVersionCached, nil
 }
 
