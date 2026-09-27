@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"encoding/json"
@@ -906,7 +906,7 @@ func (m model) hintText() string {
 	if withSkin {
 		hint = "(click a skin to see that player's loadout, or tab: switch tabs, up/down: select player)"
 	}
-	tip := weaponCategoryStyle.Render("Tip:") + " you can use the mouse. Click the tabs at the top to switch screens"
+	tip := weaponCategoryStyle.Render("Tip:") + " You can use your mouse to click on tabs, and skins"
 	if withSkin {
 		tip += ", or click a skin to open that player's loadout"
 	}
