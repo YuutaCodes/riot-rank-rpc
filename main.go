@@ -100,5 +100,4 @@ func main() {
 	// }
 
 	runTUI()
-	return
 }

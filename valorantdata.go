@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
+	"strings"
 )
 
-// fetchClientVersion returns valorant-api.com's "riotClientVersion" field — despite the name,
-// this is the Riot Client's own version, not Valorant's specific build/session version.
+// fetchClientVersion returns the Riot Client version, not the exact game build.
 func fetchClientVersion() (string, error) {
 	resp, err := http.DefaultClient.Get("https://valorant-api.com/v1/version")
 	if err != nil {
@@ -45,25 +46,56 @@ func fetchWeaponSkins() (map[string]any, error) {
 	return result, nil
 }
 
-func buildSkinNameIndex(skins []any) map[string]string {
-	index := map[string]string{}
+type SkinInfo struct {
+	Name string
+	Icon string
+}
+
+func buildSkinIndex(skins []any) map[string]SkinInfo {
+	index := map[string]SkinInfo{}
 
 	for _, s := range skins {
 		skin := s.(map[string]any)
-		displayName := skin["displayName"].(string)
+		info := SkinInfo{
+			Name: skin["displayName"].(string),
+			Icon: skinIconURL(skin),
+		}
 
 		baseUUID := skin["uuid"].(string)
-		index[baseUUID] = displayName
+		index[baseUUID] = info
 
 		levels := skin["levels"].([]any)
 		for _, l := range levels {
 			level := l.(map[string]any)
 			uuid := level["uuid"].(string)
-			index[uuid] = displayName
+			index[uuid] = info
 		}
 	}
 
 	return index
+}
+
+// skinIconURL picks the first available image: the skin's icon,
+// then its first level's icon, then its first chroma's full render.
+func skinIconURL(skin map[string]any) string {
+	if icon, ok := skin["displayIcon"].(string); ok && icon != "" {
+		return icon
+	}
+	if levels, ok := skin["levels"].([]any); ok && len(levels) > 0 {
+		if level, ok := levels[0].(map[string]any); ok {
+			if icon, ok := level["displayIcon"].(string); ok && icon != "" {
+				return icon
+			}
+		}
+	}
+	if chromas, ok := skin["chromas"].([]any); ok && len(chromas) > 0 {
+		if chroma, ok := chromas[0].(map[string]any); ok {
+			if icon, ok := chroma["fullRender"].(string); ok && icon != "" {
+				return icon
+			}
+		}
+	}
+	return ""
 }
 
 func fetchAgents() (map[string]any, error) {
@@ -96,18 +128,131 @@ func buildAgentNameIndex(agents []any) map[string]string {
 	return index
 }
 
-// skinSocketID is the fixed socket UUID GLZ uses for "which skin is equipped on this weapon"
-// confirmed live against a real loadout response. The other socket UUIDs on a weapon item
-// (buddy, spray, chroma selection, etc.) aren't resolved here yet.
+// skinSocketID is the loadout socket that holds the equipped skin.
 const skinSocketID = "bcef87d6-209b-46c6-8b19-fbe40bd95abc"
 
+// vandalWeaponID is the default primary weapon until one is picked in Settings.
+const vandalWeaponID = "9c82e19d-4575-0200-1a81-3eacf00cf872"
+
 type PlayerLoadout struct {
-	Subject   string
-	AgentName string
-	Skins     []string
+	Subject     string
+	AgentName   string
+	TeamID      string
+	Skins       []string
+	PrimarySkin string
+	// Keyed by weapon UUID.
+	WeaponSkins map[string]SkinInfo
 }
 
-func summarizeLoadouts(loadouts map[string]any, skinIndex map[string]string, agentIndex map[string]string) []PlayerLoadout {
+// WeaponOption is one selectable entry in the Settings tab's weapon list.
+type WeaponOption struct {
+	Name     string
+	UUID     string
+	Category string
+	Cost     int
+}
+
+// weaponCategoryOrder matches the in-game buy menu, left to right.
+var weaponCategoryOrder = []string{"Sidearm", "SMG", "Shotgun", "Rifle", "Sniper", "Heavy", "Melee"}
+
+func weaponCategoryRank(category string) int {
+	for i, c := range weaponCategoryOrder {
+		if c == category {
+			return i
+		}
+	}
+	return len(weaponCategoryOrder)
+}
+
+func fetchWeapons() (map[string]any, error) {
+	resp, err := http.DefaultClient.Get("https://valorant-api.com/v1/weapons")
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var result map[string]any
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func fetchCompetitiveTiers() (map[string]any, error) {
+	resp, err := http.DefaultClient.Get("https://valorant-api.com/v1/competitivetiers")
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var result map[string]any
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// buildTierNameIndex maps a tier number like 18 to "Diamond 1".
+// Uses the last entry in the list, which is the current episode.
+func buildTierNameIndex(episodes []any) map[int]string {
+	index := map[int]string{}
+	if len(episodes) == 0 {
+		return index
+	}
+
+	current := episodes[len(episodes)-1].(map[string]any)
+	tiers := current["tiers"].([]any)
+
+	for _, t := range tiers {
+		tier := t.(map[string]any)
+		number := int(tier["tier"].(float64))
+		name := tier["tierName"].(string)
+		index[number] = name
+	}
+
+	return index
+}
+
+func buildWeaponOptions(weapons []any) []WeaponOption {
+	var options []WeaponOption
+
+	for _, w := range weapons {
+		weapon := w.(map[string]any)
+		option := WeaponOption{
+			Name: weapon["displayName"].(string),
+			UUID: weapon["uuid"].(string),
+		}
+		// "EEquippableCategory::Rifle" becomes "Rifle".
+		if category, ok := weapon["category"].(string); ok {
+			option.Category = strings.TrimPrefix(category, "EEquippableCategory::")
+		}
+		// Melee has no shopData.
+		if shop, ok := weapon["shopData"].(map[string]any); ok {
+			if cost, ok := shop["cost"].(float64); ok {
+				option.Cost = int(cost)
+			}
+		}
+		options = append(options, option)
+	}
+
+	sort.SliceStable(options, func(i, j int) bool {
+		ri, rj := weaponCategoryRank(options[i].Category), weaponCategoryRank(options[j].Category)
+		if ri != rj {
+			return ri < rj
+		}
+		return options[i].Cost < options[j].Cost
+	})
+
+	return options
+}
+
+func summarizeLoadouts(loadouts map[string]any, skinIndex map[string]SkinInfo, agentIndex map[string]string, primaryWeaponID string) []PlayerLoadout {
 	var summaries []PlayerLoadout
 
 	players := loadouts["Loadouts"].([]any)
@@ -120,7 +265,8 @@ func summarizeLoadouts(loadouts map[string]any, skinIndex map[string]string, age
 		items := loadout["Items"].(map[string]any)
 
 		var skins []string
-		for _, i := range items {
+		weaponSkins := map[string]SkinInfo{}
+		for weaponID, i := range items {
 			item := i.(map[string]any)
 			sockets := item["Sockets"].(map[string]any)
 
@@ -131,17 +277,57 @@ func summarizeLoadouts(loadouts map[string]any, skinIndex map[string]string, age
 			skinItem := skinSocket["Item"].(map[string]any)
 			skinID := skinItem["ID"].(string)
 
-			if name, ok := skinIndex[skinID]; ok {
-				skins = append(skins, name)
+			if info, ok := skinIndex[skinID]; ok {
+				skins = append(skins, info.Name)
+				weaponSkins[weaponID] = info
 			}
 		}
 
+		var primarySkin string
+		if item, ok := items[primaryWeaponID].(map[string]any); ok {
+			if sockets, ok := item["Sockets"].(map[string]any); ok {
+				if skinSocket, ok := sockets[skinSocketID].(map[string]any); ok {
+					if skinItem, ok := skinSocket["Item"].(map[string]any); ok {
+						if skinID, ok := skinItem["ID"].(string); ok {
+							primarySkin = skinIndex[skinID].Name
+						}
+					}
+				}
+			}
+		}
 		summaries = append(summaries, PlayerLoadout{
-			Subject:   subject,
-			AgentName: agentIndex[characterID],
-			Skins:     skins,
+			Subject:     subject,
+			AgentName:   agentIndex[characterID],
+			Skins:       skins,
+			PrimarySkin: primarySkin,
+			WeaponSkins: weaponSkins,
 		})
 	}
 
 	return summaries
+}
+
+// teamsFromMatch maps puuid to TeamID. Missing fields are skipped.
+func teamsFromMatch(match map[string]any) map[string]string {
+	teams := map[string]string{}
+
+	players, ok := match["Players"].([]any)
+	if !ok {
+		return teams
+	}
+	for _, p := range players {
+		player, ok := p.(map[string]any)
+		if !ok {
+			continue
+		}
+		subject, ok := player["Subject"].(string)
+		if !ok {
+			continue
+		}
+		if teamID, ok := player["TeamID"].(string); ok {
+			teams[subject] = teamID
+		}
+	}
+
+	return teams
 }

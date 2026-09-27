@@ -11,6 +11,11 @@
 .env
 *.local.json
 
+# Runtime-generated local data
+peak_rank.json
+debug_dump.json
+settings.json
+
 # OS / editor
 Thumbs.db
 .DS_Store
