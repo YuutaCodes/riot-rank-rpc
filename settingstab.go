@@ -205,7 +205,9 @@ func (m model) buildColumnSettings() (string, []settingsHitbox) {
 		if c == "Skin" {
 			label = "Skin (primary weapon, in game)"
 		}
-		b.WriteString(prefix + style.Render(box+label) + "\n")
+		b.WriteString(prefix)
+		b.WriteString(style.Render(box + label))
+		b.WriteString("\n")
 		hits = append(hits, settingsHitbox{kind: settingsHitColumn, index: i, x0: paneX, x1: paneX + 40, y: listY + i})
 	}
 	return b.String(), hits
