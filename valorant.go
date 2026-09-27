@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"crypto/tls"
@@ -53,6 +53,10 @@ func fetchEntitlements(lf Lockfile) (EntitlementsToken, error) {
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	if err != nil {
 		return EntitlementsToken{}, err
+	}
+
+	if resp.StatusCode != http.StatusOK && result.Subject == "" {
+		return EntitlementsToken{}, errNotRunning
 	}
 
 	return result, nil
