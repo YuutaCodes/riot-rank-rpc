@@ -1052,7 +1052,7 @@ func runTUI() {
 var errNotRunning = errors.New("riot client is not running")
 
 // authTTL is far under the ~1 hour token lifetime, and short enough that logging out
-// of the Riot Client (which keeps the same lockfile) is noticed within a couple of polls.
+// of the Riot Client (which keeps the same lockfile) is noticed within 2 minutes.
 const authTTL = 2 * time.Minute
 
 type authResult struct {
