@@ -92,8 +92,7 @@ func (m model) buildSettings() (string, []settingsHitbox) {
 	}
 	hits = append(hits, rightHits...)
 
-	hint := "\n(tab: switch tabs, arrows: move, enter: select, or click)\n"
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, right) + "\n" + hint, hits
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, right) + "\n", hits
 }
 
 // buildWeaponSettings renders the weapon grid, one column per category.

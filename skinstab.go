@@ -319,8 +319,7 @@ func (m model) buildSkins() (string, []skinsHitbox) {
 		panes = append(panes, m.skinPreview())
 	}
 
-	hint := "(click or arrows: left/right switch column, up/down select)"
-	return lipgloss.JoinHorizontal(lipgloss.Top, panes...) + "\n\n" + hint + "\n", hits
+	return lipgloss.JoinHorizontal(lipgloss.Top, panes...) + "\n", hits
 }
 
 func (m model) skinPreview() string {

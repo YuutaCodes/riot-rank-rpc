@@ -657,6 +657,15 @@ func (m model) View() string {
 		content = m.settingsView()
 	}
 
+	// Pad between the content and the hint so the hint sits on the box's last line.
+	content = strings.TrimRight(content, "\n")
+	hint := m.hintText()
+	gap := 1
+	if m.height > 0 {
+		gap = max(m.skinsContentHeight()-lipgloss.Height(content)-lipgloss.Height(hint), 1)
+	}
+	content += strings.Repeat("\n", gap+1) + hint
+
 	box := boxStyle
 	if m.width > 0 {
 		// Border is 2 chars, padding is 4.
@@ -871,16 +880,28 @@ func (m model) buildMatchView() (string, []skinsHitbox) {
 		hits = append(hits, tableHits...)
 	}
 
+	return b.String() + "\n", hits
+}
+
+// hintText is the key help for the active tab. View pins it to the bottom of the box.
+func (m model) hintText() string {
+	switch m.activeTab {
+	case tabSkins:
+		return "(click or arrows: left/right switch column, up/down select)"
+	case tabSettings:
+		return "(tab: switch tabs, arrows: move, enter: select, or click)"
+	}
+
+	withSkin := m.gameState == StateInGame && !m.hiddenColumns["Skin"]
 	hint := "(tab: switch tabs, up/down: select player)"
 	if withSkin {
 		hint = "(click a skin to see that player's loadout, or tab: switch tabs, up/down: select player)"
 	}
-
 	tip := weaponCategoryStyle.Render("Tip:") + " you can use the mouse. Click the tabs at the top to switch screens"
 	if withSkin {
 		tip += ", or click a skin to open that player's loadout"
 	}
-	return b.String() + "\n\n" + tip + ".\n" + hint + "\n", hits
+	return tip + ".\n" + hint
 }
 
 // renderRosterTable draws one player table. topY is the screen row of its top border.
