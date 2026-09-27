@@ -299,6 +299,7 @@ func (m model) buildSkins() (string, []skinsHitbox) {
 		if m.hover == (hoverTarget{kind: hoverSkinsWeapon, index: i}) {
 			style = style.Background(hoverBackground)
 		}
+		rows[i].skin.Name = strings.TrimSuffix(rows[i].skin.Name, " "+rows[i].weapon)
 		text := fmt.Sprintf("%-9s%s", rows[i].weapon, rows[i].skin.Name)
 		weapons = append(weapons, prefix+style.Render(ansi.Truncate(text, skinsWeaponPaneWidth-4, "…")))
 		hits = append(hits, skinsHitbox{

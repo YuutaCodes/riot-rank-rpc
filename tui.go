@@ -269,9 +269,10 @@ func buildTabBar(active, hovered, width int) (string, [][2]int) {
 
 	for i, label := range tabLabels {
 		style := inactiveTabStyle
-		if i == active {
+		switch i {
+		case active:
 			style = activeTabStyle
-		} else if i == hovered {
+		case hovered:
 			style = style.Foreground(lipgloss.Color("252")).Background(hoverBackground)
 		}
 		cell := style.Render(label)
@@ -895,14 +896,14 @@ func (m model) renderRosterTable(rows []rosterRow, selected string, withSkin boo
 	if withAgent {
 		headers = append([]string{"Agent"}, headers...)
 	}
-	if withSkin {
-		weaponColumn := "Vandal"
-		for _, w := range m.weapons {
-			if w.UUID == m.primaryWeaponID {
-				weaponColumn = w.Name
-				break
-			}
+	weaponColumn := "Vandal"
+	for _, w := range m.weapons {
+		if w.UUID == m.primaryWeaponID {
+			weaponColumn = w.Name
+			break
 		}
+	}
+	if withSkin {
 		headers = append(headers, weaponColumn)
 	}
 	skinCol := len(headers) - 1
@@ -940,7 +941,7 @@ func (m model) renderRosterTable(rows []rosterRow, selected string, withSkin boo
 			cells = append([]string{r.Agent}, cells...)
 		}
 		if withSkin {
-			cells = append(cells, r.Skin)
+			cells = append(cells, strings.TrimSuffix(r.Skin, " "+weaponColumn))
 		}
 		t.Row(cells...)
 	}
@@ -1243,6 +1244,10 @@ func fetchGameStateCmd() tea.Cmd {
 		entitlements, shard, err := authenticate()
 		if err != nil {
 			return gameStateMsg{Err: err}
+		}
+
+		if _, err := fetchPartyID(shard, entitlements.Subject, entitlements.AccessToken, entitlements.Token); err != nil {
+			return gameStateMsg{State: StateWaiting, Shard: shard}
 		}
 
 		if matchID, err := fetchCoreGameMatchID(shard, entitlements.Subject, entitlements.AccessToken, entitlements.Token); err == nil {
