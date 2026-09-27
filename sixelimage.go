@@ -155,6 +155,25 @@ var overlay = &sixelOverlay{File: os.Stdout}
 
 const exitAltScreen = "\x1b[?1049l"
 
+// frameTouchesRows reports whether a Bubble Tea frame repaints any screen row in
+// [y, y+rows). In the alt screen a frame starts at the home position and sends an
+// unchanged line as a bare "\n", so any other bytes on a row mean it was redrawn,
+// which erases the image cells on that row.
+func frameTouchesRows(p []byte, y, rows int) bool {
+	rest, ok := bytes.CutPrefix(p, []byte(ansi.CursorHomePosition))
+	if !ok || bytes.Contains(rest, []byte(ansi.EraseScreenBelow)) {
+		// Not a normal frame, so assume the worst.
+		return true
+	}
+	lines := bytes.Split(rest, []byte("\n"))
+	for i := y; i < y+rows && i < len(lines); i++ {
+		if len(lines[i]) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (o *sixelOverlay) Set(img overlayImage) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -185,7 +204,9 @@ func (o *sixelOverlay) Write(p []byte) (int, error) {
 		buf.WriteString("\x1b8")
 	}
 	buf.Write(p)
-	if o.want.seq != "" {
+	// Resending a sixel is expensive, so only redraw when the image changed or this
+	// frame painted over it.
+	if o.want.seq != "" && (o.drawn != o.want || frameTouchesRows(p, o.want.y, o.want.rows)) {
 		// Save and restore the cursor, since drawing a sixel moves it.
 		buf.WriteString("\x1b7")
 		buf.WriteString(ansi.CursorPosition(o.want.x+1, o.want.y+1))
