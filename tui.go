@@ -368,6 +368,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.hover = m.hoverAt(msg.X, msg.Y)
 			return m, nil
 		}
+		if m.activeTab == tabSkins && (msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) {
+			m.skinsFocus = skinsFocusPlayers
+			if msg.X >= settingsContentX+skinsPlayerPaneWidth {
+				m.skinsFocus = skinsFocusWeapons
+			}
+			delta := 1
+			if msg.Button == tea.MouseButtonWheelUp {
+				delta = -1
+			}
+			m.moveSkinsCursor(delta)
+			return m, m.requestSkinArt()
+		}
 		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft && msg.Y < tabBarHeight {
 			_, bounds := buildTabBar(m.activeTab, -1, m.width)
 			for i, b := range bounds {

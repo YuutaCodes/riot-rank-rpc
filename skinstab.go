@@ -278,12 +278,16 @@ func (m model) buildSkins() (string, []skinsHitbox) {
 	}
 
 	pl, _ := m.selectedLoadout()
-	weapons := []string{weaponCategoryStyle.Render("LOADOUT")}
 	rows := m.skinsWeaponRows(pl)
+	start, end := m.skinsWeaponWindow(len(rows))
+	header := weaponCategoryStyle.Render("LOADOUT")
+	if end-start < len(rows) {
+		header += skinsRowStyle.Faint(true).Render(fmt.Sprintf("  %d-%d of %d", start+1, end, len(rows)))
+	}
+	weapons := []string{header}
 	if len(m.weapons) == 0 {
 		weapons = append(weapons, m.spin.View()+" Loading weapons...")
 	}
-	start, end := m.skinsWeaponWindow(len(rows))
 	for i := start; i < end; i++ {
 		prefix, style := "  ", skinsRowStyle
 		if i == m.skinsWeapon {
