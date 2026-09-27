@@ -1,7 +1,8 @@
-package main
+﻿package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"os"
@@ -79,7 +80,9 @@ type partyMsg struct {
 type GameState int
 
 const (
-	StateMenus GameState = iota
+	// StateWaiting is the zero value, so a fresh model starts out waiting for the game.
+	StateWaiting GameState = iota
+	StateMenus
 	StateAgentSelect
 	StateInGame
 )
@@ -525,6 +528,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(fetchNamesCmd(puuids), m.queuePlayerData())
 		}
 	case gameStateMsg:
+		prev := m.gameState
+		if errors.Is(msg.Err, errNotRunning) {
+			m.gameState = StateWaiting
+			m.err = nil
+			return m, nil
+		}
 		m.gameState = msg.State
 		m.match = msg.Match
 		m.pregame = msg.Pregame
@@ -535,7 +544,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if subjects := m.matchSubjects(); m.cursor >= len(subjects) {
 			m.cursor = max(len(subjects)-1, 0)
 		}
+		if prev == StateWaiting && m.err == nil {
+			return m, tea.Batch(fetchMMRCmd, fetchPartyCmd, m.queuePlayerData(), m.requestSkinArt())
+		}
 		return m, tea.Batch(m.queuePlayerData(), m.requestSkinArt())
+
 	case playerStatsMsg:
 		m.playerStats[msg.Subject] = msg.Data
 	case pollTickMsg:
@@ -585,6 +598,8 @@ func (m model) statusBar() string {
 		left = agentSelectStatusStyle.Render("AGENT SELECT")
 	case StateInGame:
 		left = inGameStatusStyle.Render("IN-GAME")
+	case StateWaiting:
+		left = lobbyStatusStyle.Render("WAITING FOR GAME")
 	default:
 		left = lobbyStatusStyle.Render("LOBBY")
 	}
@@ -825,6 +840,10 @@ func (m model) tierLabel(tier int) string {
 // buildMatchView renders the Match tab and returns where each skin cell is drawn,
 // so clicking one can open that player on the Skins tab.
 func (m model) buildMatchView() (string, []skinsHitbox) {
+	if m.gameState == StateWaiting {
+		return m.spin.View() + " Waiting for game...\n", nil
+	}
+
 	if m.err != nil && m.party == nil && len(m.loadouts) == 0 {
 		return errorStyle.Render(fmt.Sprintf("Error: %v", m.err)) + "\n", nil
 	}
@@ -1135,12 +1154,15 @@ func runTUI() {
 	}
 }
 
+// errNotRunning means the lockfile is missing, i.e. the Riot Client isn't open yet.
+var errNotRunning = errors.New("riot client is not running")
+
 func authenticate() (EntitlementsToken, string, error) {
 	path := os.Getenv("LOCALAPPDATA") + `\Riot Games\Riot Client\Config\lockfile`
 	data, err := os.ReadFile(path)
 
 	if err != nil {
-		return EntitlementsToken{}, "", fmt.Errorf("could not read lockfile (is the Riot Client running?): %w", err)
+		return EntitlementsToken{}, "", fmt.Errorf("%w: %w", errNotRunning, err)
 	}
 
 	lf, err := parseLockfile(string(data))
