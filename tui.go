@@ -264,6 +264,9 @@ var (
 	weaponCategoryStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
 	weaponColumnStyle   = lipgloss.NewStyle().Width(16).MarginBottom(1)
 
+	allyTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("78"))
+	enemyTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("203"))
+
 	// hoverBackground marks whatever clickable thing is under the mouse.
 	hoverBackground = lipgloss.Color("237")
 )
@@ -876,7 +879,14 @@ func (m model) buildMatchView() (string, []skinsHitbox) {
 		if i > 0 {
 			b.WriteString("\n\n")
 		}
-		b.WriteString(weaponCategoryStyle.Render(s.title))
+		titleStyle := weaponCategoryStyle
+		switch s.title {
+		case "ALLIES":
+			titleStyle = allyTitleStyle
+		case "ENEMIES":
+			titleStyle = enemyTitleStyle
+		}
+		b.WriteString(titleStyle.Render(s.title))
 		b.WriteString("\n")
 		if len(s.rows) == 0 {
 			b.WriteString(m.spin.View())
