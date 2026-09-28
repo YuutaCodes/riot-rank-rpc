@@ -75,6 +75,9 @@ func (m model) buildSettings() (string, []settingsHitbox) {
 			y:     settingsContentY + 1 + i,
 		})
 	}
+
+	// TODO: add toggle for showing shortcuts
+
 	left := lipgloss.NewStyle().Width(settingsCategoryPaneWidth).Render(strings.Join(categories, "\n"))
 
 	var right string

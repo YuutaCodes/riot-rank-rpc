@@ -662,6 +662,7 @@ func (m model) View() string {
 	}
 	tabBar, tabs := buildTabBar(m.activeTab, hoveredTab, m.width, m.gameState != StateInGame)
 
+	// TODO: add history tab (shows match history) (optional: show chat messages per match)
 	// A side effect, but only View knows where everything ends up.
 	*m.hits = hitboxes{tabs: tabs}
 	var content string
