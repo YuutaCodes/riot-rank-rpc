@@ -206,12 +206,12 @@ var (
 
 	boxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("63")).
+			BorderForeground(lipgloss.Color("167")).
 			Padding(1, 2)
 
 	selectedRowStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("212")).
+				Foreground(lipgloss.Color("167")).
 				Padding(0, 1)
 
 	normalRowStyle = lipgloss.NewStyle().
@@ -220,7 +220,7 @@ var (
 
 	tableHeaderStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("63")).
+				Foreground(lipgloss.Color("131")).
 				Align(lipgloss.Center).
 				Padding(0, 1)
 
@@ -237,14 +237,14 @@ var (
 
 	inactiveTabStyle = lipgloss.NewStyle().
 				Border(tabBorder, true).
-				BorderForeground(lipgloss.Color("240")).
-				Foreground(lipgloss.Color("240")).
+				BorderForeground(lipgloss.Color("235")).
+				Foreground(lipgloss.Color("235")).
 				Padding(0, 1)
 
 	activeTabStyle = inactiveTabStyle.
 			Border(activeTabBorder, true).
-			BorderForeground(lipgloss.Color("212")).
-			Foreground(lipgloss.Color("212")).
+			BorderForeground(lipgloss.Color("167")).
+			Foreground(lipgloss.Color("167")).
 			Bold(true)
 
 	// tabGapStyle stretches the line under the tabs to the full width.
@@ -256,8 +256,8 @@ var (
 	statusBarBackground = lipgloss.NewStyle().Background(lipgloss.Color("235"))
 
 	lobbyStatusStyle       = lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("230")).Bold(true).Padding(0, 1)
-	agentSelectStatusStyle = lipgloss.NewStyle().Background(lipgloss.Color("214")).Foreground(lipgloss.Color("0")).Bold(true).Padding(0, 1)
-	inGameStatusStyle      = lipgloss.NewStyle().Background(lipgloss.Color("205")).Foreground(lipgloss.Color("0")).Bold(true).Padding(0, 1)
+	agentSelectStatusStyle = lipgloss.NewStyle().Background(lipgloss.Color("11")).Foreground(lipgloss.Color("255")).Bold(true).Padding(0, 1)
+	inGameStatusStyle      = lipgloss.NewStyle().Background(lipgloss.Color("167")).Foreground(lipgloss.Color("255")).Bold(true).Padding(0, 1)
 
 	shardChipStyle = lipgloss.NewStyle().Background(lipgloss.Color("63")).Foreground(lipgloss.Color("230")).Bold(true).Padding(0, 3)
 
