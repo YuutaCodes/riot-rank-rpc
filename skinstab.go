@@ -249,8 +249,16 @@ func (m model) buildSkins() (string, []skinsHitbox) {
 
 	var players []string
 	for i, r := range m.skinsPlayerRows() {
+		titleStyle := weaponCategoryStyle
+		switch r.label {
+		case "ALLIES":
+			titleStyle = allyTitleStyle
+		case "ENEMIES":
+			titleStyle = enemyTitleStyle
+		}
+
 		if r.subject == "" {
-			players = append(players, weaponCategoryStyle.Render(r.label))
+			players = append(players, titleStyle.Render(r.label))
 			continue
 		}
 		prefix, style := "  ", skinsRowStyle
