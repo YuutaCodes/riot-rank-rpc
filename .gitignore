@@ -22,6 +22,4 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Claude Code project config/docs — local only, not for the public repo
-.claude/
-CLAUDE.md
+
