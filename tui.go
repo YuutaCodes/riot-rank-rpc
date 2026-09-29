@@ -192,13 +192,25 @@ func newModel() model {
 	}
 }
 
-var spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("69"))
+// Valorant palette. Change the theme here, not in individual styles.
+var (
+	valRed      = lipgloss.Color("#FF4655")
+	valDarkRed  = lipgloss.Color("#BD3944")
+	valOffWhite = lipgloss.Color("#ECE8E1")
+	valNavy     = lipgloss.Color("#0F1923")
+	valSlate    = lipgloss.Color("#1F2731")
+	valGray     = lipgloss.Color("#768079")
+	valTeal     = lipgloss.Color("#17E5B8")
+	valGold     = lipgloss.Color("#F0CB74")
+)
+
+var spinnerStyle = lipgloss.NewStyle().Foreground(valRed)
 
 // LIPGLOSS STYLES
 var (
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("205"))
+			Foreground(valRed)
 
 	errorStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -206,21 +218,21 @@ var (
 
 	boxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("167")).
+			BorderForeground(valRed).
 			Padding(1, 2)
 
 	selectedRowStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("167")).
+				Foreground(valRed).
 				Padding(0, 1)
 
 	normalRowStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252")).
+			Foreground(valOffWhite).
 			Padding(0, 1)
 
 	tableHeaderStyle = lipgloss.NewStyle().
 				Bold(true).
-				Foreground(lipgloss.Color("131")).
+				Foreground(valDarkRed).
 				Align(lipgloss.Center).
 				Padding(0, 1)
 
@@ -237,14 +249,14 @@ var (
 
 	inactiveTabStyle = lipgloss.NewStyle().
 				Border(tabBorder, true).
-				BorderForeground(lipgloss.Color("235")).
-				Foreground(lipgloss.Color("235")).
+				BorderForeground(valGray).
+				Foreground(valGray).
 				Padding(0, 1)
 
 	activeTabStyle = inactiveTabStyle.
 			Border(activeTabBorder, true).
-			BorderForeground(lipgloss.Color("167")).
-			Foreground(lipgloss.Color("167")).
+			BorderForeground(valRed).
+			Foreground(valRed).
 			Bold(true)
 
 	// tabGapStyle stretches the line under the tabs to the full width.
@@ -253,22 +265,22 @@ var (
 			BorderLeft(false).
 			BorderRight(false)
 
-	statusBarBackground = lipgloss.NewStyle().Background(lipgloss.Color("235"))
+	statusBarBackground = lipgloss.NewStyle().Background(valNavy)
 
-	lobbyStatusStyle       = lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("230")).Bold(true).Padding(0, 1)
-	agentSelectStatusStyle = lipgloss.NewStyle().Background(lipgloss.Color("11")).Foreground(lipgloss.Color("255")).Bold(true).Padding(0, 1)
-	inGameStatusStyle      = lipgloss.NewStyle().Background(lipgloss.Color("167")).Foreground(lipgloss.Color("255")).Bold(true).Padding(0, 1)
+	lobbyStatusStyle       = lipgloss.NewStyle().Background(valGray).Foreground(valOffWhite).Bold(true).Padding(0, 1)
+	agentSelectStatusStyle = lipgloss.NewStyle().Background(valGold).Foreground(valNavy).Bold(true).Padding(0, 1)
+	inGameStatusStyle      = lipgloss.NewStyle().Background(valRed).Foreground(valOffWhite).Bold(true).Padding(0, 1)
 
-	shardChipStyle = lipgloss.NewStyle().Background(lipgloss.Color("63")).Foreground(lipgloss.Color("230")).Bold(true).Padding(0, 3)
+	shardChipStyle = lipgloss.NewStyle().Background(valSlate).Foreground(valOffWhite).Bold(true).Padding(0, 3)
 
-	weaponCategoryStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
+	weaponCategoryStyle = lipgloss.NewStyle().Bold(true).Foreground(valOffWhite)
 	weaponColumnStyle   = lipgloss.NewStyle().Width(16).MarginBottom(1)
 
-	allyTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("78"))
-	enemyTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("203"))
+	allyTitleStyle  = lipgloss.NewStyle().Bold(true).Foreground(valTeal)
+	enemyTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(valRed)
 
 	// hoverBackground marks whatever clickable thing is under the mouse.
-	hoverBackground = lipgloss.Color("237")
+	hoverBackground = valSlate
 )
 
 const (
@@ -295,10 +307,10 @@ func buildTabBar(active, hovered, width int, dimSkins bool) (string, [][2]int) {
 		case active:
 			style = activeTabStyle
 		case hovered:
-			style = style.Foreground(lipgloss.Color("252")).Background(hoverBackground)
+			style = style.Foreground(valOffWhite).Background(hoverBackground)
 		default:
 			if dimSkins && i == tabSkins {
-				style = style.Foreground(lipgloss.Color("237"))
+				style = style.Foreground(valSlate)
 			}
 		}
 		cell := style.Render(label)
